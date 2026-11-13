@@ -3,3 +3,6 @@ node_modules/
 bench-output/
 dist/
 .DS_Store
+.next/
+next-env.d.ts
+*.tsbuildinfo
