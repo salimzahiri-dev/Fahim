@@ -6,15 +6,16 @@ import { InMemoryMisconceptionStore } from '../../core/memory/misconceptionStore
 import { InMemorySessionStore } from '../../core/session/sessionStore';
 import { loadRegistries } from '../../modules';
 import { ClaudeAdapter } from '../../providers/model/claudeAdapter';
+import type { ModelProvider } from '../../providers/model/ModelProvider';
+import { OfflineProvider } from '../../providers/model/offlineProvider';
 import { createSessionHandlers, type SessionHandlers } from './handlers';
+import { PILOT_LESSON_ID, PILOT_ORG_ID } from './pilot';
 
 /**
  * Application entry point: the only place in /app that wires real adapters and
  * reads secrets. Imported by route handlers only, so it never reaches the browser.
  */
 
-const PILOT_ORG_ID = 'pilot';
-const PILOT_LESSON_ID = 'work-kinetic-energy';
 
 function cookieSecret(production: boolean): string {
   const fromEnv = process.env.FAHIM_COOKIE_SECRET;
@@ -24,16 +25,25 @@ function cookieSecret(production: boolean): string {
   return randomBytes(32).toString('hex');
 }
 
-function build(): SessionHandlers {
-  const config = loadConfig();
+function modelProvider(production: boolean): ModelProvider {
+  // FAHIM_MODEL_PROVIDER=offline plays a session without the API, to test the interface for free.
+  if (process.env.FAHIM_MODEL_PROVIDER === 'offline') {
+    if (production) throw new Error('The offline model provider is for development only');
+    return new OfflineProvider();
+  }
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is missing on the server');
+  return new ClaudeAdapter({ apiKey, baseUrl: process.env.ANTHROPIC_BASE_URL || undefined });
+}
+
+function build(): SessionHandlers {
+  const config = loadConfig();
   const production = config.env === 'production';
 
   return createSessionHandlers({
     service: {
       engine: {
-        model: new ClaudeAdapter({ apiKey, baseUrl: process.env.ANTHROPIC_BASE_URL || undefined }),
+        model: modelProvider(production),
         modelName: config.model,
         maxTokens: config.maxTokens,
         systemPrompt: readFileSync(path.join(process.cwd(), 'prompts', 'tutor.system.md'), 'utf8'),

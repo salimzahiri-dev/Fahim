@@ -18,7 +18,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
   Done when: `npm run dev` serves a page, `npm run build` succeeds, existing tests and typecheck still pass.
 - [x] B2. Session API: one route to start a session and one to send an event, both calling `handleEvent`. Session state kept behind a `SessionStore` interface with an in-memory implementation. The student identity comes from a signed, http-only cookie set by the server, never from the request body.
   Done when: route tests cover the full loop with the scripted provider, an event for another student's session is refused, and the API key never reaches the browser.
-- [ ] B3. Session screen, phone first: conversation, bet and formula buttons, message input, experiment area. It renders the `UiAction` list returned by the engine. Sami's lines (paragraphs starting with `Sami : `) are displayed as a different speaker.
+- [x] B3. Session screen, phone first: conversation, bet and formula buttons, message input, experiment area. It renders the `UiAction` list returned by the engine. Sami's lines (paragraphs starting with `Sami : `) are displayed as a different speaker.
   Done when: a full session can be played at 390 px wide and with the keyboard only.
 - [ ] B4. Train simulation component (Canvas or SVG) driven only by the `params` and `result` of `show_simulation`: two speeds, two energy bars, the ratio.
   Done when: the component shows the values computed by the server and makes no network call.
