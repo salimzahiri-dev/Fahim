@@ -1,0 +1,44 @@
+{
+  "id": "work-kinetic-energy",
+  "moduleId": "physics-1bac-sm",
+  "title": "Travail et énergie cinétique",
+  "validated": false,
+  "trap": {
+    "text": "Le train Al Boraq roule à 160 km/h, puis à 320 km/h. Sa vitesse a doublé et sa masse n'a pas changé. Son énergie cinétique est multipliée par combien ?",
+    "choices": [
+      { "id": "x2", "label": "×2", "misconception": "EC_LINEAR_IN_V" },
+      { "id": "x4", "label": "×4", "correct": true },
+      { "id": "x8", "label": "×8" }
+    ]
+  },
+  "simulation": {
+    "id": "train-kinetic-energy",
+    "params": { "massTonnes": 400, "speedsKmh": [160, 320] },
+    "observe": "Passe le train de 160 à 320 km/h et compare les deux barres d'énergie cinétique."
+  },
+  "law": {
+    "question": "La masse n'a pas changé, seule la vitesse a doublé. Quelle formule explique la mesure ?",
+    "choices": [
+      { "id": "a", "label": "Ec = m × v", "misconception": "EC_LINEAR_IN_V" },
+      { "id": "b", "label": "Ec = ½ × m × v²", "correct": true },
+      { "id": "c", "label": "Ec = ½ × m² × v", "misconception": "EC_LINEAR_IN_V" }
+    ],
+    "guidance": [
+      "Avec ta formule, que devient l'énergie si on double seulement la vitesse ?",
+      "Compare ce résultat avec le rapport mesuré dans l'expérience.",
+      "Quelle puissance de la vitesse donne ce rapport quand la vitesse double ?"
+    ]
+  },
+  "exercise": { "generatorId": "kinetic-energy-car" },
+  "reversedRole": {
+    "samiLine": "Si je roule deux fois plus vite, il me faut deux fois plus de distance pour freiner, non ?",
+    "expectedIdea": "Le travail de la force de freinage, F × d, doit absorber toute l'énergie cinétique. Si la vitesse double, l'énergie cinétique est multipliée par 4. À force de freinage égale, la distance de freinage est donc multipliée par 4, pas par 2.",
+    "misconception": "BRAKING_LINEAR_IN_V",
+    "maxStudentReplies": 2
+  },
+  "misconceptions": [
+    { "code": "EC_LINEAR_IN_V", "label": "L'énergie cinétique est proportionnelle à la vitesse" },
+    { "code": "SPEED_UNIT_KMH", "label": "La vitesse est laissée en km/h dans la formule" },
+    { "code": "BRAKING_LINEAR_IN_V", "label": "La distance de freinage est proportionnelle à la vitesse" }
+  ]
+}
