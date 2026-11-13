@@ -14,7 +14,7 @@ describe('modules', () => {
 
   it('computes the train simulation by code', () => {
     const result = trainKineticEnergy.run({ massTonnes: 400, speedsKmh: [160, 320] });
-    expect(result).toEqual({ massTonnes: 400, speedsKmh: [160, 320], energiesMJ: [395.1, 1580.2], ratio: 4 });
+    expect(result).toEqual({ massTonnes: 400, speedsKmh: [160, 320], energiesMJ: [395.1, 1580.2], ratio: 4, speedRatio: 2 });
   });
 
   it('rejects a lesson with no correct choice or an unknown misconception code', () => {

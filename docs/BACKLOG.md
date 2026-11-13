@@ -20,7 +20,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
   Done when: route tests cover the full loop with the scripted provider, an event for another student's session is refused, and the API key never reaches the browser.
 - [x] B3. Session screen, phone first: conversation, bet and formula buttons, message input, experiment area. It renders the `UiAction` list returned by the engine. Sami's lines (paragraphs starting with `Sami : `) are displayed as a different speaker.
   Done when: a full session can be played at 390 px wide and with the keyboard only.
-- [ ] B4. Train simulation component (Canvas or SVG) driven only by the `params` and `result` of `show_simulation`: two speeds, two energy bars, the ratio.
+- [x] B4. Train simulation component (Canvas or SVG) driven only by the `params` and `result` of `show_simulation`: two speeds, two energy bars, the ratio.
   Done when: the component shows the values computed by the server and makes no network call.
 - [ ] B5. Exercise panel and end-of-session summary panel. Formulas rendered with KaTeX.
   Done when: the summary shows the bet, the attempts and the misconceptions recorded during the session.

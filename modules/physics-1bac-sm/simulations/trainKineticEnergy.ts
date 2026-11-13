@@ -21,6 +21,7 @@ export const trainKineticEnergy: Simulation = {
       speedsKmh: [low, high],
       energiesMJ: [Math.round(eLow * 10) / 10, Math.round(eHigh * 10) / 10],
       ratio: Math.round((eHigh / eLow) * 100) / 100,
+      speedRatio: Math.round((high / low) * 100) / 100,
     };
   },
 };
