@@ -85,11 +85,11 @@ export const DIRECTIVES = {
   lawGuide:
     'The student is writing during the law step. Help with a guiding question, without writing the expected formula. Remind them that they choose the formula with the buttons.',
   exercise:
-    'The student is working on the exercise. If they give a value, call check_answer with their answer copied as is, then use the diagnosis. If they ask a question, help with a hint without doing the calculation.',
+    'The student is working on the exercise. If they give a value, call check_answer with their answer copied as is, then use the diagnosis. If they ask a question, help with a hint without doing the calculation. Until a diagnosis names it, do not point at a specific pitfall (units, square, factor): ask what they would do first instead.',
   exerciseChecked: (diagnosisJson: string): string =>
     `The server has checked the student's answer. Result: ${diagnosisJson}. Reply by following this result. Do not call check_answer.`,
   reversedRole:
-    'The student is answering Sami. If they agree with Sami\'s mistake, record the misconception. Reply first as Sami (paragraph starting with "Sami : "): if the explanation was good, Sami understands; otherwise Sami asks a naive question that points at the problem.',
+    'The student is answering Sami. If they agree with Sami\'s mistake, record the misconception. Reply only as Sami, in a single paragraph starting with "Sami : ": if the explanation was good, Sami understands; otherwise Sami asks a naive question that points at the problem. Add nothing in your tutor voice and do not name the concepts the student should use: the student must find the explanation alone.',
   reversedRoleEnd:
     'This is the student\'s last reply to Sami. If they agree with Sami\'s mistake, record the misconception. Have Sami react in one sentence (paragraph starting with "Sami : "). Then, in your tutor voice, say clearly whether the explanation was right, give the expected idea in two sentences if it was missing, and close the session.',
   summary:

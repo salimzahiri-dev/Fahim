@@ -8,7 +8,8 @@ This repository currently holds the **pilot core**: the tutor's brain, with no w
 
 | Path | Content |
 |---|---|
-| `docs/` | Vision, architecture, working rules for agents, decision records |
+| `CLAUDE.md` | Entry point for coding agents |
+| `docs/` | Vision, architecture, working rules for agents, backlog, decision records |
 | `core/session/` | Session engine (server-driven state machine), agent tools, per-step context |
 | `core/memory/` | Misconception map (in-memory for now, same interface as the future PostgreSQL one) |
 | `core/billing/` | Session cost estimate |

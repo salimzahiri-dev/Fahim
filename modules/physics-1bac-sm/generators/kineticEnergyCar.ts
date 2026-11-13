@@ -62,6 +62,53 @@ export function parseAnswer(text: string): { value: number; unit: AnswerUnit } |
   return withEnergyUnit.at(-1) ?? bare.at(-1) ?? (found.at(-1) as { value: number; unit: AnswerUnit });
 }
 
+function diagnose(values: Record<string, number>, value: number, unit: 'kJ' | 'J' | null): Diagnosis {
+  const m = values.massKg as number;
+  const vKmh = values.speedKmh as number;
+  const expected = expectedKJ(values);
+
+  if (unit === 'J') {
+    if (close(value, expected * 1000)) {
+      return { correct: true, code: 'correct_in_joules', hint: 'Right answer, given in joules. Remind them of the conversion to kJ.' };
+    }
+  } else if (close(value, expected)) {
+    return { correct: true, code: 'correct', hint: 'Right answer.' };
+  }
+
+  const inKJ = unit === 'J' ? value / 1000 : value;
+  if (unit === null && close(value, expected * 1000)) {
+    return {
+      correct: false,
+      code: 'in_joules',
+      hint: 'The calculation is right but the result is in joules. Have them convert to kJ without giving the value.',
+    };
+  }
+  if (close(inKJ, (0.5 * m * vKmh * vKmh) / 1000)) {
+    return {
+      correct: false,
+      code: 'speed_not_converted',
+      misconception: 'SPEED_UNIT_KMH',
+      hint: 'The student kept the speed in km/h. Make them find that it must first be converted to m/s, without giving the result.',
+    };
+  }
+  if (close(inKJ, (m * (vKmh / 3.6) ** 2) / 1000)) {
+    return { correct: false, code: 'missing_half', hint: 'The student forgot the factor ½. Have them rewrite the full formula.' };
+  }
+  if (close(inKJ, (0.5 * m * (vKmh / 3.6)) / 1000)) {
+    return {
+      correct: false,
+      code: 'speed_not_squared',
+      misconception: 'EC_LINEAR_IN_V',
+      hint: 'The student did not square the speed. Send them back to what the experiment showed.',
+    };
+  }
+  return {
+    correct: false,
+    code: 'other',
+    hint: 'Wrong answer, error not recognized. Ask them to write their steps: speed conversion, then formula.',
+  };
+}
+
 export const kineticEnergyCar: ExerciseGenerator = {
   id: 'kinetic-energy-car',
 
@@ -76,58 +123,26 @@ export const kineticEnergyCar: ExerciseGenerator = {
 
   check(values, answerText): Diagnosis {
     const parsed = parseAnswer(answerText);
-    if (!parsed || parsed.unit === 'other') {
+    if (!parsed) {
       return { correct: false, code: 'no_answer', hint: 'The student did not give an energy value. Ask for a value in kJ.' };
     }
-    const m = values.massKg as number;
-    const vKmh = values.speedKmh as number;
-    const expected = expectedKJ(values);
-    const { value, unit } = parsed;
+    if (parsed.unit !== 'other') return diagnose(values, parsed.value, parsed.unit);
 
-    if (unit === 'J') {
-      if (close(value, expected * 1000)) {
-        return { correct: true, code: 'correct_in_joules', hint: 'Right answer, given in joules. Remind them of the conversion to kJ.' };
-      }
-    } else if (close(value, expected)) {
-      return { correct: true, code: 'correct', hint: 'Right answer.' };
+    // The number carries a unit that is not an energy ("6075 km/h"). It still counts as an
+    // attempt when the value itself is the answer or a recognizable error; otherwise it is
+    // a step of the work ("90 km/h", "25 m/s") and not an answer.
+    const asBare = diagnose(values, parsed.value, null);
+    if (asBare.code === 'other') {
+      return { correct: false, code: 'no_answer', hint: 'The student did not give an energy value. Ask for a value in kJ.' };
     }
-
-    const inKJ = unit === 'J' ? value / 1000 : value;
-    if (unit === null && close(value, expected * 1000)) {
+    if (asBare.correct) {
       return {
         correct: false,
-        code: 'in_joules',
-        hint: 'The calculation is right but the result is in joules. Have them convert to kJ without giving the value.',
+        code: 'wrong_unit_label',
+        hint: 'The value is right but the student wrote a unit that is not an energy. Ask which unit an energy is expressed in, without restating the value.',
       };
     }
-    if (close(inKJ, (0.5 * m * vKmh * vKmh) / 1000)) {
-      return {
-        correct: false,
-        code: 'speed_not_converted',
-        misconception: 'SPEED_UNIT_KMH',
-        hint: 'The student kept the speed in km/h. Make them find that it must first be converted to m/s, without giving the result.',
-      };
-    }
-    if (close(inKJ, (m * (vKmh / 3.6) ** 2) / 1000)) {
-      return {
-        correct: false,
-        code: 'missing_half',
-        hint: 'The student forgot the factor ½. Have them rewrite the full formula.',
-      };
-    }
-    if (close(inKJ, (0.5 * m * (vKmh / 3.6)) / 1000)) {
-      return {
-        correct: false,
-        code: 'speed_not_squared',
-        misconception: 'EC_LINEAR_IN_V',
-        hint: 'The student did not square the speed. Send them back to what the experiment showed.',
-      };
-    }
-    return {
-      correct: false,
-      code: 'other',
-      hint: 'Wrong answer, error not recognized. Ask them to write their steps: speed conversion, then formula.',
-    };
+    return { ...asBare, hint: `${asBare.hint} The student also wrote a unit that is not an energy: have them fix that too.` };
   },
 
   solution(values) {

@@ -17,8 +17,15 @@ import { PROFILES, type BenchProfile } from './profiles';
  * checks are a safety net, not a judgement of teaching quality.
  */
 
-const LEAK_BEFORE_BET = /(×|\bx|fois)\s*(4|quatre)\b|multipli\w*\s+par\s+(4|quatre)|quadrupl|v\s*(²|\^\s*2)|au carré/i;
+const LEAK_BEFORE_BET = /(×|\bx|fois)\s*(4|quatre)\b|multipli\S*\s+par\s+(4|quatre)|quadrupl|v\s*(²|\^\s*2)|au carré/i;
 const MAX_FREE_TURNS = 8;
+
+/** Listing the three bet choices ("×2, ×4 ou ×8") is not a leak; asserting one of them is. */
+export function leaksBeforeBet(tutorText: string): boolean {
+  const listsChoices = /×\s*2\b/.test(tutorText) && /×\s*4\b/.test(tutorText) && /×\s*8\b/.test(tutorText);
+  const cleaned = listsChoices ? tutorText.replace(/×\s*[248]\b/g, '') : tutorText;
+  return LEAK_BEFORE_BET.test(cleaned);
+}
 
 interface Line {
   who: 'tutor' | 'student' | 'event';
@@ -55,7 +62,7 @@ async function play(base: EngineDeps, profile: BenchProfile): Promise<{ lines: L
     state = turn.state;
     for (const t of turn.tutorText) {
       lines.push({ who: 'tutor', text: t });
-      if (beforeBet && LEAK_BEFORE_BET.test(t)) flags.push(`leak before bet: "${t.slice(0, 120)}"`);
+      if (beforeBet && leaksBeforeBet(t)) flags.push(`leak before bet: "${t.slice(0, 120)}"`);
       if (state.exercise && !state.exercise.solved) {
         const expected = expectedKJ(state.exercise.values);
         const pattern = new RegExp(`(^|[^\\d])${String(expected).replace('.', '[.,]')}(\\s?000)?([^\\d]|$)`);
@@ -113,4 +120,5 @@ async function main(): Promise<void> {
   if (failed) process.exit(1);
 }
 
-void main();
+// Run only when executed directly, so the helpers above can be imported by tests.
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('tests/bench/run.ts')) void main();

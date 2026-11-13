@@ -56,6 +56,10 @@ describe('kinetic energy exercise', () => {
     expect(kineticEnergyCar.check(values, '1200 kg')).toMatchObject({ correct: false, code: 'no_answer' });
     expect(kineticEnergyCar.check(values, '90 km/h')).toMatchObject({ correct: false, code: 'no_answer' });
     expect(kineticEnergyCar.check(values, 'v = 25 m/s')).toMatchObject({ correct: false, code: 'no_answer' });
+    // A recognizable value with the wrong unit label is still an attempt.
+    expect(kineticEnergyCar.check(values, '4860 km/h')).toMatchObject({ correct: false, code: 'speed_not_converted', misconception: 'SPEED_UNIT_KMH' });
+    expect(kineticEnergyCar.check(values, '375 km/h')).toMatchObject({ correct: false, code: 'wrong_unit_label' });
+    expect(kineticEnergyCar.check(values, '375 km/h').hint).not.toMatch(/375/);
   });
 
   it('never puts the expected value in a hint for a wrong answer', () => {
