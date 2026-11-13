@@ -19,10 +19,10 @@ export const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {
   launch_simulation: {
     name: 'launch_simulation',
     description:
-      "Affiche la simulation de la leçon dans la zone d'expérience de l'élève et renvoie les valeurs mesurées. À appeler juste après le pari. Les paramètres sont fixés par la leçon.",
+      "Displays the lesson's simulation in the student's experiment area and returns the measured values. Call it right after the bet. Parameters are fixed by the lesson.",
     inputSchema: {
       type: 'object',
-      properties: { simulation_id: { type: 'string', description: 'Identifiant de la simulation de la leçon.' } },
+      properties: { simulation_id: { type: 'string', description: 'Identifier of the lesson simulation.' } },
       required: ['simulation_id'],
       additionalProperties: false,
     },
@@ -30,10 +30,10 @@ export const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {
   generate_exercise: {
     name: 'generate_exercise',
     description:
-      "Tire de nouvelles valeurs pour l'exercice de la leçon et renvoie l'énoncé. Les valeurs et la réponse attendue sont calculées par le serveur.",
+      "Draws new values for the lesson's exercise and returns the statement. Values and the expected answer are computed by the server.",
     inputSchema: {
       type: 'object',
-      properties: { generator_id: { type: 'string', description: "Identifiant du générateur d'exercice de la leçon." } },
+      properties: { generator_id: { type: 'string', description: 'Identifier of the lesson exercise generator.' } },
       required: ['generator_id'],
       additionalProperties: false,
     },
@@ -41,10 +41,10 @@ export const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {
   check_answer: {
     name: 'check_answer',
     description:
-      "Vérifie la réponse de l'élève à l'exercice en cours. Renvoie si elle est juste et, sinon, d'où vient l'erreur. À appeler dès que l'élève donne une valeur : ne juge jamais un résultat numérique toi-même.",
+      "Checks the student's answer to the exercise in progress. Returns whether it is right and, if not, where the error comes from. Call it as soon as the student gives a value: never judge a numeric result yourself.",
     inputSchema: {
       type: 'object',
-      properties: { answer: { type: 'string', description: "La réponse de l'élève, recopiée telle quelle." } },
+      properties: { answer: { type: 'string', description: "The student's answer, copied as is." } },
       required: ['answer'],
       additionalProperties: false,
     },
@@ -52,10 +52,10 @@ export const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {
   record_misconception: {
     name: 'record_misconception',
     description:
-      "Note une idée fausse que l'élève vient de montrer, par son code. N'utilise que les codes listés dans la leçon.",
+      'Records a misconception the student has just shown, by its code. Use only the codes listed in the lesson.',
     inputSchema: {
       type: 'object',
-      properties: { code: { type: 'string', description: "Code de l'idée fausse." } },
+      properties: { code: { type: 'string', description: 'Code of the misconception.' } },
       required: ['code'],
       additionalProperties: false,
     },
@@ -134,7 +134,7 @@ export async function checkAnswer(ctx: ToolContext, answer: string): Promise<Rec
   if (!generator) throw new Error(`Generator not registered: ${exercise.generatorId}`);
   const diagnosis = generator.check(exercise.values, answer);
   flags.answerChecked = true;
-  if (diagnosis.code !== 'not_a_number') exercise.attempts += 1;
+  if (diagnosis.code !== 'no_answer') exercise.attempts += 1;
   if (diagnosis.misconception) {
     await misconceptions.record(state.orgId, state.studentId, diagnosis.misconception);
   }
@@ -148,55 +148,55 @@ export async function checkAnswer(ctx: ToolContext, answer: string): Promise<Rec
     guidance: diagnosis.hint,
     attempts: exercise.attempts,
     solution: generator.solution(exercise.values),
-    next: `Confirme en une phrase avec la solution ci-dessus. Puis annonce le rôle inversé : l'élève devient le professeur. Écris ensuite, dans un paragraphe séparé qui commence par « Sami : », cette phrase exacte : ${lesson.reversedRole.samiLine}`,
+    next: `Confirm in one sentence using the solution above. Then announce the reversed role: the student becomes the teacher. Then write, in a separate paragraph that starts with "Sami : ", this exact sentence: ${lesson.reversedRole.samiLine}`,
   };
 }
 
 export async function executeTool(name: string, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutcome> {
-  if (!(TOOL_NAMES as readonly string[]).includes(name)) return fail(`Outil inconnu : ${name}.`);
+  if (!(TOOL_NAMES as readonly string[]).includes(name)) return fail(`Unknown tool: ${name}.`);
   const tool = name as ToolName;
   if (!ctx.allowed.includes(tool)) {
-    return fail(`L'outil ${tool} n'est pas disponible à cette étape de la séance. Continue sans lui.`);
+    return fail(`The tool ${tool} is not available at this step of the session. Carry on without it.`);
   }
 
   try {
     switch (tool) {
       case 'launch_simulation': {
         const id = readString(input, 'simulation_id');
-        if (id === null) return fail('Paramètres invalides : seul simulation_id est accepté.');
+        if (id === null) return fail('Invalid parameters: only simulation_id is accepted.');
         if (id !== ctx.lesson.simulation.id) {
-          return fail(`Cette simulation n'appartient pas à la leçon. Utilise ${ctx.lesson.simulation.id}.`);
+          return fail(`This simulation does not belong to the lesson. Use ${ctx.lesson.simulation.id}.`);
         }
         return ok({ simulation: id, result: launchSimulation(ctx), observe: ctx.lesson.simulation.observe });
       }
       case 'generate_exercise': {
         const id = readString(input, 'generator_id');
-        if (id === null) return fail('Paramètres invalides : seul generator_id est accepté.');
+        if (id === null) return fail('Invalid parameters: only generator_id is accepted.');
         if (id !== ctx.lesson.exercise.generatorId) {
-          return fail(`Ce générateur n'appartient pas à la leçon. Utilise ${ctx.lesson.exercise.generatorId}.`);
+          return fail(`This generator does not belong to the lesson. Use ${ctx.lesson.exercise.generatorId}.`);
         }
         // One exercise per session in the pilot: a second draw would silently replace the values the student is working on.
-        if (ctx.state.exercise) return fail("Un exercice est déjà en cours pour cette séance. Sers-toi de son énoncé.");
+        if (ctx.state.exercise) return fail('An exercise is already in progress for this session. Use its statement.');
         return ok(generateExercise(ctx));
       }
       case 'check_answer': {
         const answer = readString(input, 'answer');
-        if (answer === null) return fail('Paramètres invalides : seul answer est accepté.');
-        if (!ctx.state.exercise) return fail("Aucun exercice en cours. Appelle d'abord generate_exercise.");
-        if (ctx.state.exercise.solved) return fail("L'exercice est déjà réussi.");
+        if (answer === null) return fail('Invalid parameters: only answer is accepted.');
+        if (!ctx.state.exercise) return fail('No exercise in progress. Call generate_exercise first.');
+        if (ctx.state.exercise.solved) return fail('The exercise is already solved.');
         return ok(await checkAnswer(ctx, answer));
       }
       case 'record_misconception': {
         const code = readString(input, 'code');
-        if (code === null) return fail('Paramètres invalides : seul code est accepté.');
+        if (code === null) return fail('Invalid parameters: only code is accepted.');
         if (!ctx.lesson.misconceptions.some((m) => m.code === code)) {
-          return fail(`Code inconnu. Codes de la leçon : ${ctx.lesson.misconceptions.map((m) => m.code).join(', ')}.`);
+          return fail(`Unknown code. Codes of the lesson: ${ctx.lesson.misconceptions.map((m) => m.code).join(', ')}.`);
         }
         await ctx.misconceptions.record(ctx.state.orgId, ctx.state.studentId, code);
         return ok({ recorded: code });
       }
     }
   } catch (error) {
-    return fail(`Erreur du serveur pendant ${tool}. Continue la séance sans cet outil.`);
+    return fail(`Server error during ${tool}. Carry on with the session without this tool.`);
   }
 }

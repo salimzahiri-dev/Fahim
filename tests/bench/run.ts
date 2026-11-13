@@ -29,11 +29,11 @@ async function studentSays(deps: EngineDeps, profile: BenchProfile, lines: Line[
   const history = lines
     .filter((l) => l.who !== 'event')
     .slice(-12)
-    .map((l) => `${l.who === 'tutor' ? 'Tuteur' : 'Toi'} : ${l.text}`)
+    .map((l) => `${l.who === 'tutor' ? 'Tutor' : 'You'}: ${l.text}`)
     .join('\n');
   const response = await deps.model.respond({
-    systemPrompt: `Tu joues un élève marocain de 1re bac sciences maths qui discute avec un tuteur de physique. Ton profil : ${profile.persona}\nÉcris uniquement ta prochaine réplique d'élève, en une ou deux phrases, sans guillemets ni commentaire.`,
-    messages: [{ role: 'user', content: [{ type: 'text', text: `${situation}\n\nConversation jusqu'ici :\n${history}\n\nTa réplique :` }] }],
+    systemPrompt: `You play a Moroccan student in 1re bac sciences maths talking with a physics tutor. Your profile: ${profile.persona}\nWrite only your next line as the student, in French, in one or two sentences, with no quotation marks and no commentary.`,
+    messages: [{ role: 'user', content: [{ type: 'text', text: `${situation}\n\nConversation so far:\n${history}\n\nYour line:` }] }],
     tools: [],
     model: deps.modelName,
     maxTokens: 200,
@@ -65,20 +65,20 @@ async function play(base: EngineDeps, profile: BenchProfile): Promise<{ lines: L
     return turn;
   };
 
-  await send({ type: 'start' }, '[ouvre la séance]');
-  const early = await studentSays(deps, profile, lines, "Le tuteur vient de te poser une question et attend ton pari. Tu écris un message au lieu de parier.");
+  await send({ type: 'start' }, '[opens the session]');
+  const early = await studentSays(deps, profile, lines, 'The tutor has just asked you a question and is waiting for your bet. You write a message instead of betting.');
   await send({ type: 'message', text: early }, early);
-  await send({ type: 'bet', choiceId: profile.bet }, `[parie ${profile.bet}]`);
+  await send({ type: 'bet', choiceId: profile.bet }, `[bets ${profile.bet}]`);
   for (const choice of profile.law) {
     if (state.step !== 'law') break;
-    await send({ type: 'law_choice', choiceId: choice }, `[choisit la formule ${choice}]`);
+    await send({ type: 'law_choice', choiceId: choice }, `[chooses formula ${choice}]`);
   }
 
   for (let i = 0; i < MAX_FREE_TURNS && (state.step === 'exercise' || state.step === 'reversed_role'); i++) {
     const situation =
       state.step === 'exercise'
-        ? `Tu dois répondre à cet exercice : ${state.exercise?.statement ?? ''}`
-        : 'Un camarade, Sami, te dit quelque chose de faux. Tu lui réponds.';
+        ? `You must answer this exercise: ${state.exercise?.statement ?? ''}`
+        : 'A classmate, Sami, tells you something wrong. You answer him.';
     const reply = await studentSays(deps, profile, lines, situation);
     await send({ type: 'message', text: reply }, reply);
   }
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
     const cost = estimateCostUsd(state.usage, config);
     total += cost;
     const body = lines
-      .map((l) => (l.who === 'tutor' ? `**Fahim** : ${l.text}` : l.who === 'student' ? `**Élève** : ${l.text}` : `_${l.text}_`))
+      .map((l) => (l.who === 'tutor' ? `**Fahim**: ${l.text}` : l.who === 'student' ? `**Student**: ${l.text}` : `_${l.text}_`))
       .join('\n\n');
     writeFileSync(
       `bench-output/${profile.id}.md`,

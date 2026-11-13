@@ -19,52 +19,53 @@ export function buildStepContext(
   directive: string,
 ): string {
   const lines: string[] = [];
-  lines.push('# Étape en cours');
-  lines.push(`Leçon : ${lesson.title}`);
-  lines.push(`Étape : ${state.step}`);
+  lines.push('# Current step');
+  lines.push(`Lesson: ${lesson.title}`);
+  lines.push(`Step: ${state.step}`);
+  lines.push('Lesson content below is in French because the student reads it in French.');
   lines.push('');
-  lines.push(`Le piège : ${lesson.trap.text}`);
-  lines.push(`Choix proposés à l'élève : ${labels(lesson.trap.choices)}`);
+  lines.push(`The trap: ${lesson.trap.text}`);
+  lines.push(`Choices offered to the student: ${labels(lesson.trap.choices)}`);
 
   const afterBet = state.betChoiceId !== null;
   if (afterBet) {
     const bet = lesson.trap.choices.find((c) => c.id === state.betChoiceId);
-    lines.push(`Pari de l'élève : ${bet?.label ?? '?'}`);
-    lines.push(`Simulation de la leçon : ${lesson.simulation.id}. Ce que l'élève doit y faire : ${lesson.simulation.observe}`);
+    lines.push(`The student's bet: ${bet?.label ?? '?'}`);
+    lines.push(`Simulation of the lesson: ${lesson.simulation.id}. What the student must do in it: ${lesson.simulation.observe}`);
   }
 
   if (afterBet && state.simulationLaunched && ['law', 'exercise', 'reversed_role', 'summary'].includes(state.step)) {
     const correct = lesson.law.choices.find((c) => c.correct);
     lines.push('');
-    lines.push(`Question de la loi : ${lesson.law.question}`);
-    lines.push(`Formules proposées à l'élève : ${labels(lesson.law.choices)}`);
-    lines.push(`Loi à faire trouver (ne l'écris pas tant que l'élève ne l'a pas choisie) : ${correct?.label ?? ''}`);
-    lines.push('Questions de guidage possibles :');
+    lines.push(`Law question: ${lesson.law.question}`);
+    lines.push(`Formulas offered to the student: ${labels(lesson.law.choices)}`);
+    lines.push(`Law to be found (do not write it until the student has chosen it): ${correct?.label ?? ''}`);
+    lines.push('Possible guiding questions:');
     for (const g of lesson.law.guidance) lines.push(`- ${g}`);
   }
 
   if (state.exercise && ['exercise', 'reversed_role', 'summary'].includes(state.step)) {
     lines.push('');
-    lines.push(`Exercice en cours : ${state.exercise.statement}`);
-    lines.push(`Essais : ${state.exercise.attempts}. Réussi : ${state.exercise.solved ? 'oui' : 'non'}.`);
+    lines.push(`Exercise in progress: ${state.exercise.statement}`);
+    lines.push(`Attempts: ${state.exercise.attempts}. Solved: ${state.exercise.solved ? 'yes' : 'no'}.`);
   }
 
   if (['reversed_role', 'summary'].includes(state.step)) {
     lines.push('');
-    lines.push(`Réplique de départ de Sami : ${lesson.reversedRole.samiLine}`);
-    lines.push(`Ce que l'élève doit réussir à expliquer : ${lesson.reversedRole.expectedIdea}`);
-    lines.push(`Si l'élève est d'accord avec Sami, note l'idée fausse ${lesson.reversedRole.misconception}.`);
+    lines.push(`Sami's opening line: ${lesson.reversedRole.samiLine}`);
+    lines.push(`What the student must manage to explain: ${lesson.reversedRole.expectedIdea}`);
+    lines.push(`If the student agrees with Sami, record the misconception ${lesson.reversedRole.misconception}.`);
   }
 
   lines.push('');
-  lines.push('Idées fausses de la leçon (code : libellé) :');
-  for (const m of lesson.misconceptions) lines.push(`- ${m.code} : ${m.label}`);
+  lines.push('Misconceptions of the lesson (code: label):');
+  for (const m of lesson.misconceptions) lines.push(`- ${m.code}: ${m.label}`);
   if (known.length > 0) {
-    lines.push(`Déjà repérées chez cet élève : ${known.map((k) => `${k.code} (vue ${k.seenCount} fois)`).join(', ')}`);
+    lines.push(`Already seen for this student: ${known.map((k) => `${k.code} (seen ${k.seenCount} times)`).join(', ')}`);
   }
 
   lines.push('');
-  lines.push('## Consigne pour ce tour');
+  lines.push('## Directive for this turn');
   lines.push(directive);
   return lines.join('\n');
 }
@@ -72,25 +73,25 @@ export function buildStepContext(
 /** Directives sent to the model for each server-decided situation. */
 export const DIRECTIVES = {
   presentTrap:
-    "L'élève vient d'ouvrir la séance. Salue-le en une phrase, puis pose le piège avec tes mots, sans rien expliquer. Termine en lui demandant de parier avec les boutons. Ne donne aucun indice sur la réponse.",
+    'The student has just opened the session. Greet them in one sentence, then pose the trap in your own words, without explaining anything. End by asking them to bet with the buttons. Give no hint about the answer.',
   betRequired:
-    "L'élève a écrit un message au lieu de parier. Ne réponds pas sur le fond et ne donne ni résultat ni formule. Rappelle-lui en une ou deux phrases qu'il doit d'abord choisir un pari avec les boutons, et pourquoi cela l'aidera.",
+    'The student wrote a message instead of betting. Do not answer on the substance and give neither the result nor the formula. Remind them in one or two sentences that they must first pick a bet with the buttons, and why it will help them.',
   betPlaced:
-    "L'élève vient de parier. Dis-lui que son pari est noté, sans dire s'il est juste. Lance la simulation avec l'outil launch_simulation, puis dis-lui en une phrase quoi faire dans la zone d'expérience.",
+    'The student has just bet. Tell them the bet is noted, without saying whether it is right. Launch the simulation with the launch_simulation tool, then tell them in one sentence what to do in the experiment area.',
   lawWrong: (label: string, attempt: number): string =>
-    `L'élève a choisi la formule « ${label} », qui n'explique pas la mesure (essai ${attempt}). Ne donne pas la bonne formule. Fais-lui tester son choix : que prédit cette formule quand la vitesse double, et est-ce le rapport mesuré ? Demande-lui ensuite de choisir à nouveau.`,
+    `The student chose the formula "${label}", which does not explain the measurement (attempt ${attempt}). Do not give the right formula. Make them test their choice: what does this formula predict when the speed doubles, and is that the measured value? Then ask them to choose again.`,
   lawRight: (label: string, betWasCorrect: boolean): string =>
-    `L'élève a choisi la bonne formule : « ${label} ». Confirme en une phrase en reliant le carré de la vitesse au rapport mesuré${betWasCorrect ? '' : ', et fais le lien avec son pari de départ sans le lui reprocher'}. Puis appelle generate_exercise et présente l'énoncé renvoyé.`,
+    `The student chose the right formula: "${label}". Confirm in one sentence by linking the square of the speed to the measured value${betWasCorrect ? '' : ', and connect it to their initial bet without blaming them'}. Then call generate_exercise and present the statement it returns.`,
   lawGuide:
-    "L'élève écrit pendant l'étape de la loi. Aide-le par une question de guidage, sans écrire la formule attendue. Rappelle-lui qu'il choisit la formule avec les boutons.",
+    'The student is writing during the law step. Help with a guiding question, without writing the expected formula. Remind them that they choose the formula with the buttons.',
   exercise:
-    "L'élève travaille sur l'exercice. S'il donne une valeur, appelle check_answer avec sa réponse recopiée telle quelle, puis sers-toi du diagnostic. S'il pose une question, aide-le par un indice sans faire le calcul.",
+    'The student is working on the exercise. If they give a value, call check_answer with their answer copied as is, then use the diagnosis. If they ask a question, help with a hint without doing the calculation.',
   exerciseChecked: (diagnosisJson: string): string =>
-    `Le serveur a vérifié la réponse de l'élève. Résultat : ${diagnosisJson}. Réponds en suivant ce résultat. N'appelle pas check_answer.`,
+    `The server has checked the student's answer. Result: ${diagnosisJson}. Reply by following this result. Do not call check_answer.`,
   reversedRole:
-    "L'élève répond à Sami. S'il est d'accord avec l'erreur de Sami, note l'idée fausse. Réponds d'abord en tant que Sami (paragraphe « Sami : ») : s'il a bien expliqué, Sami comprend ; sinon Sami pose une question naïve qui met le doigt sur le problème.",
+    'The student is answering Sami. If they agree with Sami\'s mistake, record the misconception. Reply first as Sami (paragraph starting with "Sami : "): if the explanation was good, Sami understands; otherwise Sami asks a naive question that points at the problem.',
   reversedRoleEnd:
-    "C'est la dernière réponse de l'élève à Sami. S'il est d'accord avec l'erreur de Sami, note l'idée fausse. Fais réagir Sami en une phrase (paragraphe « Sami : »). Puis, avec ta voix de tuteur, dis clairement si l'explication était juste, donne l'idée attendue en deux phrases si elle manquait, et conclus la séance.",
+    'This is the student\'s last reply to Sami. If they agree with Sami\'s mistake, record the misconception. Have Sami react in one sentence (paragraph starting with "Sami : "). Then, in your tutor voice, say clearly whether the explanation was right, give the expected idea in two sentences if it was missing, and close the session.',
   summary:
-    "La séance est terminée. Réponds en une ou deux phrases et propose à l'élève de revenir pour la prochaine leçon.",
+    'The session is over. Reply in one or two sentences and invite the student to come back for the next lesson.',
 } as const;

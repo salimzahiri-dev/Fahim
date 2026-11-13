@@ -15,7 +15,7 @@ The pilot needs the teaching loop working before any platform feature. `ARCHITEC
 5. **One exercise per session.** A second draw would replace the values the student is working on. "New values" will be a student action in the interface, not a model decision.
 6. **The reversed role ends after a fixed number of student replies** (set per lesson, 2 for the first lesson). The tutor judges the explanation in words and records a misconception if needed; the server ends the step.
 7. **Bet and formula misconceptions are recorded by the server** from the lesson file, without relying on the model.
-8. **The tutor's prompt is in French.** It is content the tutor speaks from, not project documentation.
+8. **Everything addressed to the model is in English**: the system prompt, the per-step directives, tool descriptions, tool results and diagnosis hints. Only what the student reads is in French: lesson content, exercise statements and solutions, and the two fallback tutor messages. The prompt tells the tutor to always write to the student in French.
 
 ## Consequences
 

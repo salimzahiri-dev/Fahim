@@ -9,7 +9,7 @@ export interface Diagnosis {
   code: string;
   /** Misconception recorded automatically when the error reveals one. */
   misconception?: string;
-  /** Guidance for the tutor, in French. Never contains the expected value unless the answer is correct. */
+  /** Guidance for the tutor model. Never contains the expected value unless the answer is correct. */
   hint: string;
 }
 
@@ -17,7 +17,7 @@ export interface ExerciseGenerator {
   id: string;
   generate(rng: Rng): { values: Record<string, number>; statement: string };
   check(values: Record<string, number>, answerText: string): Diagnosis;
-  /** Worked solution in French, shown only once the exercise is solved. */
+  /** Worked solution in French (the student reads it), shown only once the exercise is solved. */
   solution(values: Record<string, number>): string;
 }
 

@@ -106,6 +106,7 @@ async function runModel(
 
     if (round === MAX_TOOL_ROUNDS) {
       // The model keeps calling tools: close the turn with a plain reply so the transcript stays valid.
+      // Shown to the student, hence in French.
       added.push(text('assistant', 'Reprenons. Où en étais-tu ?'));
       texts.push('Reprenons. Où en étais-tu ?');
     }
@@ -148,6 +149,7 @@ export async function handleEvent(current: SessionState, event: SessionEvent, de
   const commit = (out: LoopOutput): string[] => {
     state.transcript.push(...out.messages);
     if (out.texts.length === 0) {
+      // Shown to the student, hence in French.
       const fallback = "Je n'ai pas réussi à répondre. Peux-tu reformuler ?";
       state.transcript.push(text('assistant', fallback));
       return [fallback];
@@ -167,7 +169,7 @@ export async function handleEvent(current: SessionState, event: SessionEvent, de
   switch (event.type) {
     case 'start': {
       requireStep(state, 'trap', event);
-      tutorText = await run("(L'élève ouvre la séance.)", DIRECTIVES.presentTrap);
+      tutorText = await run('(The student opens the session.)', DIRECTIVES.presentTrap);
       state.step = 'bet';
       ui.push(publicChoices(lesson, 'bet'));
       break;
@@ -210,7 +212,7 @@ export async function handleEvent(current: SessionState, event: SessionEvent, de
         // Same guarantee as for the simulation: the exercise exists even if the model skipped the tool.
         const drawn = generateExercise(ctx);
         tutorText.push(drawn.statement);
-        state.transcript.push(text('user', "(Le serveur a affiché l'énoncé.)"), text('assistant', drawn.statement));
+        state.transcript.push(text('user', '(The server displayed the statement.)'), text('assistant', drawn.statement));
       }
       break;
     }
@@ -238,7 +240,7 @@ export async function handleEvent(current: SessionState, event: SessionEvent, de
           tutorText = await run(studentText, DIRECTIVES.exercise);
           const generator = state.exercise ? deps.registries.generators.get(state.exercise.generatorId) : undefined;
           const looksNumeric =
-            state.exercise && generator && generator.check(state.exercise.values, studentText).code !== 'not_a_number';
+            state.exercise && generator && generator.check(state.exercise.values, studentText).code !== 'no_answer';
           if (!ctx.flags.answerChecked && looksNumeric && state.exercise && !state.exercise.solved) {
             // The student gave a value but the model judged it without the tool.
             // Discard that reply and answer again from the server's own check.

@@ -49,9 +49,9 @@ describe('session engine', () => {
     expect(turn.state.step).toBe('bet');
     for (const request of model.requests) {
       expect(request.tools).toEqual([]);
-      expect(request.systemPrompt).not.toMatch(/v²|1580|395|ratio|correct|Loi à faire trouver/);
+      expect(request.systemPrompt).not.toMatch(/v²|1580|395|ratio|correct|Law to be found/);
     }
-    expect(model.requests[1]!.systemPrompt).toContain("au lieu de parier");
+    expect(model.requests[1]!.systemPrompt).toContain('instead of betting');
   });
 
   it('rejects events that do not match the current step', async () => {
@@ -163,7 +163,7 @@ describe('session engine', () => {
     expect(turn.tutorText).toEqual(['Exact. Sami : Si je roule deux fois plus vite…']);
     expect(JSON.stringify(turn.state.transcript)).not.toContain('Oui c’est juste !');
     const last = model.requests.at(-1)!;
-    expect(last.systemPrompt).toContain('Le serveur a vérifié la réponse');
+    expect(last.systemPrompt).toContain("The server has checked the student's answer");
     expect(last.tools.map((t) => t.name)).toEqual(['record_misconception']);
   });
 
@@ -215,7 +215,7 @@ describe('session engine', () => {
 
     const second = await handleEvent(first.state, { type: 'message', text: 'Non, l’énergie est ×4 donc la distance aussi' }, deps);
     expect(second.state.step).toBe('summary');
-    expect(model.requests.at(-1)!.systemPrompt).toContain('dernière réponse');
+    expect(model.requests.at(-1)!.systemPrompt).toContain('last reply to Sami');
     expect(second.ui).toEqual([
       {
         type: 'show_summary',

@@ -14,7 +14,7 @@ This repository currently holds the **pilot core**: the tutor's brain, with no w
 | `core/billing/` | Session cost estimate |
 | `providers/model/` | Vendor-neutral `ModelProvider` interface, Claude adapter (plain HTTPS, no SDK), scripted provider for tests |
 | `modules/physics-1bac-sm/` | Lesson "Travail et énergie cinétique", its simulation and its exercise generator |
-| `prompts/` | The tutor's system prompt |
+| `prompts/` | The tutor's system prompt (in English; the tutor writes to students in French) |
 | `scripts/chat.ts` | A full session in the terminal |
 | `tests/unit/` | Offline tests: generator, simulation, adapter, engine guarantees |
 | `tests/bench/` | Simulated students played against the real tutor model |

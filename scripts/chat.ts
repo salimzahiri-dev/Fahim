@@ -15,16 +15,16 @@ function show(turn: TurnResult): Extract<UiAction, { type: 'show_choices' }> | n
   for (const action of turn.ui) {
     if (action.type === 'show_simulation') {
       console.log(`\n[Simulation ${action.simulationId}] ${JSON.stringify(action.result)}`);
-      console.log(`[À faire] ${action.observe}`);
+      console.log(`[To do] ${action.observe}`);
     } else if (action.type === 'show_exercise') {
-      console.log(`\n[Exercice] ${action.statement}`);
+      console.log(`\n[Exercise] ${action.statement}`);
     } else if (action.type === 'show_summary') {
-      console.log(`\n[Bilan] ${JSON.stringify(action, null, 2)}`);
+      console.log(`\n[Summary] ${JSON.stringify(action, null, 2)}`);
     } else {
       choices = action;
     }
   }
-  if (choices) console.log(`\n[Choix] ${choices.choices.map((c) => `${c.id} = ${c.label}`).join('   ')}`);
+  if (choices) console.log(`\n[Choices] ${choices.choices.map((c) => `${c.id} = ${c.label}`).join('   ')}`);
   return choices;
 }
 
@@ -40,7 +40,7 @@ async function main(): Promise<void> {
   let choices = show(turn);
 
   const prompt = (): void => {
-    process.stdout.write(`\n(${state.step}) Toi > `);
+    process.stdout.write(`\n(${state.step}) You > `);
   };
   prompt();
   for (;;) {
@@ -60,7 +60,7 @@ async function main(): Promise<void> {
         state = turn.state;
         choices = show(turn) ?? (state.step === 'bet' || state.step === 'law' ? choices : null);
       } catch (error) {
-        console.log(`[Refusé] ${(error as Error).message}`);
+        console.log(`[Refused] ${(error as Error).message}`);
       }
     }
     prompt();
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
 
   rl.close();
   console.log(
-    `\nUsage : ${state.usage.inputTokens} jetons en entrée, ${state.usage.outputTokens} en sortie. Coût estimé : ${estimateCostUsd(state.usage, config).toFixed(4)} $.`,
+    `\nUsage: ${state.usage.inputTokens} input tokens, ${state.usage.outputTokens} output tokens. Estimated cost: $${estimateCostUsd(state.usage, config).toFixed(4)}.`,
   );
 }
 

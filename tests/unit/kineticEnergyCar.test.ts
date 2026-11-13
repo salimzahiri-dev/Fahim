@@ -24,6 +24,10 @@ describe('kinetic energy exercise', () => {
     expect(parseAnswer('Ec = 375,0 kJ')).toEqual({ value: 375, unit: 'kJ' });
     expect(parseAnswer('375 000 J')).toEqual({ value: 375000, unit: 'J' });
     expect(parseAnswer('je ne sais pas')).toBeNull();
+    // A full calculation: the answer is the number with the energy unit, or the last bare number.
+    expect(parseAnswer('Ec = 0,5 × 1200 × 25² = 375 kJ')).toEqual({ value: 375, unit: 'kJ' });
+    expect(parseAnswer('90 km/h = 25 m/s donc 0,5*1200*625 = 375000')).toEqual({ value: 375000, unit: null });
+    expect(parseAnswer('1500 km/h')).toEqual({ value: 1500, unit: 'other' });
   });
 
   it('accepts the correct answer within tolerance', () => {
@@ -47,7 +51,11 @@ describe('kinetic energy exercise', () => {
       misconception: 'EC_LINEAR_IN_V',
     });
     expect(kineticEnergyCar.check(values, '42')).toMatchObject({ correct: false, code: 'other' });
-    expect(kineticEnergyCar.check(values, 'aucune idée')).toMatchObject({ correct: false, code: 'not_a_number' });
+    expect(kineticEnergyCar.check(values, 'aucune idée')).toMatchObject({ correct: false, code: 'no_answer' });
+    // A step of the work is not an attempt at the answer.
+    expect(kineticEnergyCar.check(values, '1200 kg')).toMatchObject({ correct: false, code: 'no_answer' });
+    expect(kineticEnergyCar.check(values, '90 km/h')).toMatchObject({ correct: false, code: 'no_answer' });
+    expect(kineticEnergyCar.check(values, 'v = 25 m/s')).toMatchObject({ correct: false, code: 'no_answer' });
   });
 
   it('never puts the expected value in a hint for a wrong answer', () => {

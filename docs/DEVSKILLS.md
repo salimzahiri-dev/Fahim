@@ -47,7 +47,7 @@ Examples of off-topic work unless requested: rankings between students, badges, 
 ## Code conventions
 
 - TypeScript in strict mode. No `any` without a comment that justifies it.
-- Code identifiers, comments, commit messages and project documents are in English. Interface text and lesson content are in French.
+- Code identifiers, comments, commit messages and project documents are in English. So is everything addressed to the model: prompts, directives, tool descriptions and tool results. Only what the student reads is in French: interface text and lesson content.
 - Exercise generators and checking functions are pure functions: same inputs, same outputs, no network or database access.
 - A SQL migration never modifies a migration already applied. Add a new one.
 - The tutor agent's prompts are versioned files, not strings scattered through the code.

@@ -29,20 +29,37 @@ function close(a: number, b: number): boolean {
   return Math.abs(a - b) <= Math.abs(b) * TOLERANCE;
 }
 
-/** Reads the first number of a free-text answer and the unit the student wrote, if any. */
-export function parseAnswer(text: string): { value: number; unit: 'kJ' | 'J' | null } | null {
+type AnswerUnit = 'kJ' | 'J' | 'other' | null;
+
+function unitAfter(rest: string): AnswerUnit {
+  if (/^\s*kj/.test(rest)) return 'kJ';
+  if (/^\s*(j\b|joule)/.test(rest)) return 'J';
+  // A number followed by a unit that is not an energy ("1500 km/h", "25 m/s") is a step of the work, not an answer.
+  if (/^\s*(km\s*\/\s*h|kmh\b|m\s*\/\s*s|kg\b)/.test(rest)) return 'other';
+  return null;
+}
+
+/**
+ * Reads the value a student means as their answer in a free-text message.
+ * Students often write their whole calculation, so the answer is the last
+ * number carrying an energy unit, or else the last number with no unit.
+ */
+export function parseAnswer(text: string): { value: number; unit: AnswerUnit } | null {
   const cleaned = text
     .toLowerCase()
-    .replace(/[  ]/g, ' ')
+    .replace(/[\u202f\u00a0]/g, ' ')
     .replace(/(\d)\s+(?=\d{3}(\D|$))/g, '$1')
     .replace(/(\d),(\d)/g, '$1.$2');
-  const match = cleaned.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/);
-  if (!match) return null;
-  const value = Number(match[0]);
-  if (!Number.isFinite(value)) return null;
-  const rest = cleaned.slice((match.index ?? 0) + match[0].length);
-  const unit = /^\s*kj/.test(rest) ? 'kJ' : /^\s*(j\b|joule)/.test(rest) ? 'J' : null;
-  return { value, unit };
+  const found: Array<{ value: number; unit: AnswerUnit }> = [];
+  for (const match of cleaned.matchAll(/\d+(?:\.\d+)?(?:e[+-]?\d+)?/g)) {
+    const value = Number(match[0]);
+    if (!Number.isFinite(value)) continue;
+    found.push({ value, unit: unitAfter(cleaned.slice(match.index + match[0].length)) });
+  }
+  if (found.length === 0) return null;
+  const withEnergyUnit = found.filter((f) => f.unit === 'kJ' || f.unit === 'J');
+  const bare = found.filter((f) => f.unit === null);
+  return withEnergyUnit.at(-1) ?? bare.at(-1) ?? (found.at(-1) as { value: number; unit: AnswerUnit });
 }
 
 export const kineticEnergyCar: ExerciseGenerator = {
@@ -59,8 +76,8 @@ export const kineticEnergyCar: ExerciseGenerator = {
 
   check(values, answerText): Diagnosis {
     const parsed = parseAnswer(answerText);
-    if (!parsed) {
-      return { correct: false, code: 'not_a_number', hint: "L'élève n'a pas donné de nombre. Demande-lui une valeur en kJ." };
+    if (!parsed || parsed.unit === 'other') {
+      return { correct: false, code: 'no_answer', hint: 'The student did not give an energy value. Ask for a value in kJ.' };
     }
     const m = values.massKg as number;
     const vKmh = values.speedKmh as number;
@@ -69,10 +86,10 @@ export const kineticEnergyCar: ExerciseGenerator = {
 
     if (unit === 'J') {
       if (close(value, expected * 1000)) {
-        return { correct: true, code: 'correct_in_joules', hint: 'Réponse juste, donnée en joules. Rappelle la conversion en kJ.' };
+        return { correct: true, code: 'correct_in_joules', hint: 'Right answer, given in joules. Remind them of the conversion to kJ.' };
       }
     } else if (close(value, expected)) {
-      return { correct: true, code: 'correct', hint: 'Réponse juste.' };
+      return { correct: true, code: 'correct', hint: 'Right answer.' };
     }
 
     const inKJ = unit === 'J' ? value / 1000 : value;
@@ -80,7 +97,7 @@ export const kineticEnergyCar: ExerciseGenerator = {
       return {
         correct: false,
         code: 'in_joules',
-        hint: 'Le calcul est juste mais le résultat est en joules. Fais-lui convertir en kJ sans lui donner la valeur.',
+        hint: 'The calculation is right but the result is in joules. Have them convert to kJ without giving the value.',
       };
     }
     if (close(inKJ, (0.5 * m * vKmh * vKmh) / 1000)) {
@@ -88,14 +105,14 @@ export const kineticEnergyCar: ExerciseGenerator = {
         correct: false,
         code: 'speed_not_converted',
         misconception: 'SPEED_UNIT_KMH',
-        hint: "L'élève a gardé la vitesse en km/h. Fais-lui trouver qu'il faut d'abord la convertir en m/s, sans donner le résultat.",
+        hint: 'The student kept the speed in km/h. Make them find that it must first be converted to m/s, without giving the result.',
       };
     }
     if (close(inKJ, (m * (vKmh / 3.6) ** 2) / 1000)) {
       return {
         correct: false,
         code: 'missing_half',
-        hint: "L'élève a oublié le facteur ½. Fais-lui réécrire la formule complète.",
+        hint: 'The student forgot the factor ½. Have them rewrite the full formula.',
       };
     }
     if (close(inKJ, (0.5 * m * (vKmh / 3.6)) / 1000)) {
@@ -103,13 +120,13 @@ export const kineticEnergyCar: ExerciseGenerator = {
         correct: false,
         code: 'speed_not_squared',
         misconception: 'EC_LINEAR_IN_V',
-        hint: "L'élève n'a pas mis la vitesse au carré. Renvoie-le à ce que l'expérience a montré.",
+        hint: 'The student did not square the speed. Send them back to what the experiment showed.',
       };
     }
     return {
       correct: false,
       code: 'other',
-      hint: "Réponse fausse, erreur non reconnue. Demande-lui d'écrire ses étapes : conversion de la vitesse, puis formule.",
+      hint: 'Wrong answer, error not recognized. Ask them to write their steps: speed conversion, then formula.',
     };
   },
 
