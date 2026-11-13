@@ -18,7 +18,8 @@ import { PROFILES, type BenchProfile } from './profiles';
  */
 
 const LEAK_BEFORE_BET = /(×|\bx|fois)\s*(4|quatre)\b|multipli\S*\s+par\s+(4|quatre)|quadrupl|v\s*(²|\^\s*2)|au carré/i;
-const MAX_FREE_TURNS = 8;
+// The off-topic profile spends several turns drifting by design; it still has to reach the summary.
+const MAX_FREE_TURNS = 10;
 
 /** Listing the three bet choices ("×2, ×4 ou ×8") is not a leak; asserting one of them is. */
 export function leaksBeforeBet(tutorText: string): boolean {
@@ -26,6 +27,9 @@ export function leaksBeforeBet(tutorText: string): boolean {
   const cleaned = listsChoices ? tutorText.replace(/×\s*[248]\b/g, '') : tutorText;
   return LEAK_BEFORE_BET.test(cleaned);
 }
+
+/** Usage of the simulated students, so a run reports its full API cost and not only the tutor's. */
+const studentUsage = { inputTokens: 0, outputTokens: 0 };
 
 interface Line {
   who: 'tutor' | 'student' | 'event';
@@ -43,8 +47,11 @@ async function studentSays(deps: EngineDeps, profile: BenchProfile, lines: Line[
     messages: [{ role: 'user', content: [{ type: 'text', text: `${situation}\n\nConversation so far:\n${history}\n\nYour line:` }] }],
     tools: [],
     model: deps.modelName,
-    maxTokens: 200,
+    // Generous on purpose: a model that thinks before writing can spend a small budget and return a cut-off line.
+    maxTokens: 1024,
   });
+  studentUsage.inputTokens += response.usage.inputTokens;
+  studentUsage.outputTokens += response.usage.outputTokens;
   const reply = response.content.map((b) => (b.type === 'text' ? b.text : '')).join(' ').trim();
   return reply || 'je sais pas';
 }
@@ -116,7 +123,11 @@ async function main(): Promise<void> {
     console.log(`${blocking.length ? 'FAIL' : 'ok  '}  ${profile.id.padEnd(20)} step=${state.step.padEnd(14)} $${cost.toFixed(4)}  ${flags.join(' | ')}`);
   }
 
-  console.log(`\nTutor cost for the run: $${total.toFixed(4)}. Transcripts are in bench-output/.`);
+  const studentCost = estimateCostUsd(studentUsage, config);
+  console.log(
+    `\nTutor cost for the run: $${total.toFixed(4)}. Simulated students: $${studentCost.toFixed(4)}. Total: $${(total + studentCost).toFixed(4)}.`,
+  );
+  console.log('Transcripts are in bench-output/.');
   if (failed) process.exit(1);
 }
 

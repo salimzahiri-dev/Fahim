@@ -7,7 +7,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
 ## Stage A: tutor quality
 
 - [x] A0. Pilot core: session engine, tools, lesson, exercise generator, Claude adapter, unit tests.
-- [ ] A1. Run `npm run bench` on the current code and fix the prompt or directives until no profile has a blocking flag. Known weak points from manual sessions: the tutor names the unit pitfall before any diagnosis, and adds a hint in its own voice during the reversed role.
+- [x] A1. Run `npm run bench` on the current code and fix the prompt or directives until no profile has a blocking flag. Known weak points from manual sessions: the tutor names the unit pitfall before any diagnosis, and adds a hint in its own voice during the reversed role.
   Done when: six profiles reach `summary` with no blocking flag on two consecutive runs, and the transcripts read well. Bench summary attached to the report.
 - [ ] A2. **(owner task)** Have a 1re bac SM physics teacher review `modules/physics-1bac-sm/lessons/work-kinetic-energy.json`.
   Done when: corrections are applied and `validated` is `true`, with the reviewer and date noted in a decision record.

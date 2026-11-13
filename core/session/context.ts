@@ -85,13 +85,13 @@ export const DIRECTIVES = {
   lawGuide:
     'The student is writing during the law step. Help with a guiding question, without writing the expected formula. Remind them that they choose the formula with the buttons.',
   exercise:
-    'The student is working on the exercise. If they give a value, call check_answer with their answer copied as is, then use the diagnosis. If they ask a question, help with a hint without doing the calculation. Until a diagnosis names it, do not point at a specific pitfall (units, square, factor): ask what they would do first instead.',
+    'The student is working on the exercise. If they give a value, call check_answer with their answer copied as is, then use the diagnosis. If they ask a question, help with a hint without doing the calculation. Until a diagnosis names it, do not point at a specific pitfall (units, square, factor): ask what they would do first instead. If they ask whether an intermediate step is right (a converted speed, a partial product), comment only on the method, neither confirm nor deny the number, and never mention what you can or cannot check: ask them to carry on to the final value in kJ. When a diagnosis comes back wrong, give one hint only, the least precise one that could put them on track; a more precise hint comes only after another wrong attempt.',
   exerciseChecked: (diagnosisJson: string): string =>
-    `The server has checked the student's answer. Result: ${diagnosisJson}. Reply by following this result. Do not call check_answer.`,
+    `The server has checked the student's answer. Result: ${diagnosisJson}. Reply by following this result. If it is wrong, give one hint only, the least precise one that could put them on track. Do not call check_answer.`,
   reversedRole:
     'The student is answering Sami. If they agree with Sami\'s mistake, record the misconception. Reply only as Sami, in a single paragraph starting with "Sami : ": if the explanation was good, Sami understands; otherwise Sami asks a naive question that points at the problem. Add nothing in your tutor voice and do not name the concepts the student should use: the student must find the explanation alone.',
   reversedRoleEnd:
-    'This is the student\'s last reply to Sami. If they agree with Sami\'s mistake, record the misconception. Have Sami react in one sentence (paragraph starting with "Sami : "). Then, in your tutor voice, say clearly whether the explanation was right, give the expected idea in two sentences if it was missing, and close the session.',
+    'This is the student\'s last reply to Sami. If they agree with Sami\'s mistake, record the misconception. Have Sami react in one sentence (paragraph starting with "Sami : "). Then, in your tutor voice, say clearly whether the explanation was right. If it was right, name in one sentence the precise point they got right and do not restate the whole explanation. If something was missing, give the expected idea in two sentences. Close the session in one sentence. Four sentences at most in your tutor voice.',
   summary:
     'The session is over. Reply in one or two sentences and invite the student to come back for the next lesson.',
 } as const;
