@@ -39,7 +39,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
 
 ## Stage D: ship the pilot
 
-- [ ] D1. Dockerfile for the application and a compose file with PostgreSQL.
+- [x] D1. Dockerfile for the application and a compose file with PostgreSQL.
   Done when: a fresh clone starts with one command and a session can be played.
 - [ ] D2. **(ask first)** Choose the host, deploy, set up a daily database backup copied to a second place.
   Done when: the pilot address works from a phone on mobile data and a restore from backup has been tried once.

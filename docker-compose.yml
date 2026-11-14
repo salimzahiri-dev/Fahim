@@ -1,0 +1,51 @@
+# Local run of the whole application: docker compose up --build
+# Then open http://localhost:3100 and sign in with the code printed by the "init" service.
+#
+# Defaults are for a local machine only: development mode, offline model (no API spending),
+# local database passwords. A real deployment sets FAHIM_ENV=production, real passwords,
+# FAHIM_COOKIE_SECRET and ANTHROPIC_API_KEY (backlog D2).
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: fahim
+      POSTGRES_PASSWORD: ${FAHIM_DB_PASSWORD:-fahim_local_only}
+    volumes:
+      - fahim-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fahim"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  init:
+    build:
+      context: .
+      target: tools
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_ADMIN_URL: postgres://postgres:${FAHIM_DB_PASSWORD:-fahim_local_only}@db:5432/fahim
+      FAHIM_APP_DB_PASSWORD: ${FAHIM_APP_DB_PASSWORD:-fahim_app_local_only}
+      FAHIM_ENV: ${FAHIM_ENV:-development}
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: app
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${FAHIM_PORT:-3100}:3000"
+    environment:
+      DATABASE_URL: postgres://fahim_app:${FAHIM_APP_DB_PASSWORD:-fahim_app_local_only}@db:5432/fahim
+      FAHIM_ENV: ${FAHIM_ENV:-development}
+      FAHIM_MODEL_PROVIDER: ${FAHIM_MODEL_PROVIDER:-offline}
+      FAHIM_COOKIE_SECRET: ${FAHIM_COOKIE_SECRET:-}
+      FAHIM_MAX_SESSIONS_PER_DAY: ${FAHIM_MAX_SESSIONS_PER_DAY:-3}
+
+volumes:
+  fahim-db:

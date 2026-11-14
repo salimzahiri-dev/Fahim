@@ -2,71 +2,79 @@
 
 A physics and mathematics tutor for Moroccan students in 1re bac sciences maths. It never gives the lesson first: the student bets, tests, then teaches. See `docs/VISION.md`.
 
-This repository currently holds the **pilot core**: the tutor's brain, with no web interface and no database yet.
-
-## What is here
-
-| Path | Content |
-|---|---|
-| `CLAUDE.md` | Entry point for coding agents |
-| `docs/` | Vision, architecture, working rules for agents, backlog, decision records |
-| `core/session/` | Session engine (server-driven state machine), agent tools, per-step context |
-| `core/memory/` | Misconception map (in-memory for now, same interface as the future PostgreSQL one) |
-| `core/billing/` | Session cost estimate |
-| `providers/model/` | Vendor-neutral `ModelProvider` interface, Claude adapter (plain HTTPS, no SDK), scripted provider for tests |
-| `modules/physics-1bac-sm/` | Lesson "Travail et énergie cinétique", its simulation and its exercise generator |
-| `prompts/` | The tutor's system prompt (in English; the tutor writes to students in French) |
-| `scripts/chat.ts` | A full session in the terminal |
-| `tests/unit/` | Offline tests: generator, simulation, adapter, engine guarantees |
-| `tests/bench/` | Simulated students played against the real tutor model |
+This repository holds the pilot: one lesson ("Travail et énergie cinétique"), the tutor, a phone-first web app, sign-in with invitation codes and PostgreSQL storage with row-level security.
 
 ## Run it
+
+### Everything in containers (one command)
+
+Requires Docker.
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost:3100 and sign in with the code printed by the `init` service. This local stack runs in development mode with the offline model (no API key, no cost) and local-only database passwords. See `docs/decisions/0005-container-and-environments.md` before any real deployment.
+
+### For development
 
 Requires Node 20.12 or later.
 
 ```bash
 npm install
-npm test            # offline, no API key needed
+npm test               # offline unit tests, no API key, no database
 npm run typecheck
+npm run build
 
-cp .env.example .env   # then put your API key in .env
-npm run chat           # one session in the terminal
-npm run bench          # six simulated students; transcripts in bench-output/
-npm run bench -- role-change   # a single profile
+npm run dev            # web app at http://localhost:3000, in-memory storage
+FAHIM_MODEL_PROVIDER=offline npm run dev   # same, without calling the model API
+
+cp .env.example .env   # then fill it in; never commit .env
+npm run chat           # one session in the terminal (calls the model API)
+npm run bench          # six simulated students against the real model (about $1)
 ```
 
-In the terminal chat, type a choice id (`x2`, `b`) to press a button, anything else to write a message, `quit` to stop.
-
-## Guarantees enforced by code, with a test for each
-
-- The model is shown neither the measured result nor the law before the student has bet.
-- The model never sees the expected answer of an exercise; only the checking tool knows it.
-- The server, not the model, moves the session from one step to the next.
-- Simulation values, exercise values and answer checks are computed by code.
-- No tool accepts a student or organization identifier; extra parameters are refused.
-- A tool is only usable at the steps where it makes sense.
-- A lesson not validated by a teacher is refused when `NODE_ENV=production`.
-
-## Status and limits
-
-- **The lesson content has not been validated by a teacher.** `validated` is `false` in the lesson file; set it to `true` only after review.
-- The bench and the terminal chat need an API key and have not been run against a real model yet. The first bench run is the next step: read the transcripts, then tune `prompts/tutor.system.md`.
-- No web interface, accounts, database or container yet. They come next, in the order given in `docs/VISION.md`.
-
-## Next steps
-
-1. Run the bench, read the six transcripts, fix the prompt.
-2. Have a 1re bac SM physics teacher review the lesson file.
-3. Add the web interface (Next.js) on top of `handleEvent`, then PostgreSQL storage behind the existing interfaces.
-
-## Database tests
-
-The isolation tests run against a throwaway PostgreSQL in Docker (data in memory, port 55432 on 127.0.0.1):
+### Database
 
 ```bash
-npm run db:test:up     # start the test database
-npm run test:db        # migrations + row-level security isolation tests
-npm run db:test:down   # stop it
+npm run db:test:up     # throwaway PostgreSQL for tests (127.0.0.1:55432, data in memory)
+npm run test:db        # migrations, row-level security isolation, stores, sign-in, quotas
+npm run db:test:down
+
+npm run db:migrate     # apply db/migrations and db/policies with DATABASE_ADMIN_URL
+npm run invite -- --org "Pilote Fahim" --name "Élève 1"     # create a student, print their code once
+npm run invite -- --org "Pilote Fahim" --replace <student id> # new code, the old one stops working
 ```
 
-Migrations are numbered SQL files in `db/migrations`; row-level security policies are in `db/policies`, one file per table. `npm run db:migrate` applies both with `DATABASE_ADMIN_URL`.
+With `DATABASE_URL` set, the web app stores sessions and the misconception map in PostgreSQL and asks for an invitation code; without it, it keeps everything in memory and, in development only, gives each browser an anonymous student.
+
+## Layout
+
+| Path | Content |
+|---|---|
+| `CLAUDE.md`, `docs/` | Instructions for agents, vision, architecture, working rules, backlog, decision records |
+| `core/session/` | Session engine (server-driven state machine), agent tools, per-step context, session service and store interface |
+| `core/access/` | Identity, the single permission check, signed cookie, invitation codes |
+| `core/memory/`, `core/billing/` | Misconception map interface; cost estimate and daily session limit |
+| `providers/model/` | `ModelProvider` interface, Claude adapter (plain HTTPS), scripted and offline providers |
+| `providers/postgres/` | Pool, `withIdentity` (sets `app.org_id`/`app.user_id` per transaction), PostgreSQL stores, invitations |
+| `modules/physics-1bac-sm/` | The lesson, its simulation (computation and React view) and its exercise generator |
+| `app/` | Next.js pages, API routes and server wiring |
+| `db/` | Numbered SQL migrations, one row-level security policy file per table, migration runner |
+| `prompts/` | The tutor's system prompt (in English; the tutor writes to students in French) |
+| `tests/unit/`, `tests/db/`, `tests/bench/` | Offline tests, PostgreSQL tests, simulated students |
+
+## Guarantees enforced by code, with tests
+
+- The model is shown neither the measured result nor the law before the student has bet, and never sees the expected answer of an exercise.
+- The server, not the model, moves the session from one step to the next.
+- Simulation values, exercise values and answer checks are computed by code.
+- No tool and no request body carries a student or organization identifier; identity comes from a signed, http-only cookie.
+- Every organization table has row-level security, forced, and the application connects as a role that is neither owner nor superuser.
+- Invitation codes are stored hashed, with a limit on failed attempts.
+- In production: unvalidated lessons, the offline model and anonymous students are refused.
+
+## Status
+
+- **The lesson has not been validated by a teacher** (`validated: false`, backlog A2).
+- Deployment, backups and the owner's review page are the next steps (`docs/BACKLOG.md`).
