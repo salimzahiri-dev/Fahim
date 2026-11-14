@@ -42,6 +42,22 @@ export async function createInvitedStudent(
   }
 }
 
+/** Creates the pilot owner (role platform_admin, no student profile) and issues their code. */
+export async function createInvitedOwner(admin: pg.Client, input: { orgId: string; displayName: string }): Promise<{ userId: string; code: string }> {
+  await admin.query('BEGIN');
+  try {
+    const user = await admin.query<{ id: string }>('INSERT INTO users (display_name) VALUES ($1) RETURNING id', [input.displayName]);
+    const userId = user.rows[0]!.id;
+    await admin.query("INSERT INTO memberships (org_id, user_id, role) VALUES ($1, $2, 'platform_admin')", [input.orgId, userId]);
+    const code = await issueInvitation(admin, input.orgId, userId);
+    await admin.query('COMMIT');
+    return { userId, code };
+  } catch (error) {
+    await admin.query('ROLLBACK');
+    throw error;
+  }
+}
+
 /** Issues a new code for a person, revoking the previous one. Returns the code: it is never stored. */
 export async function issueInvitation(admin: pg.Client, orgId: string, userId: string): Promise<string> {
   const { code, hash } = generateInvitationCode();

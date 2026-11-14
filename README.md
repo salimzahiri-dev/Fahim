@@ -43,8 +43,11 @@ npm run db:test:down
 
 npm run db:migrate     # apply db/migrations and db/policies with DATABASE_ADMIN_URL
 npm run invite -- --org "Pilote Fahim" --name "Élève 1"     # create a student, print their code once
-npm run invite -- --org "Pilote Fahim" --replace <student id> # new code, the old one stops working
+npm run invite -- --org "Pilote Fahim" --owner "Propriétaire"  # the owner account for the review page
+npm run invite -- --org "Pilote Fahim" --replace <user id>    # new code, the old one stops working
 ```
+
+The owner signs in with their code like a student, then opens `/revue`: the sessions of the organization with the step reached and the cost, and each transcript. The role is read from the database at each request; every view is written to `access_log` in the same transaction as the read. Anyone else gets a 404.
 
 With `DATABASE_URL` set, the web app stores sessions and the misconception map in PostgreSQL and asks for an invitation code; without it, it keeps everything in memory and, in development only, gives each browser an anonymous student.
 
@@ -56,6 +59,7 @@ With `DATABASE_URL` set, the web app stores sessions and the misconception map i
 | `core/session/` | Session engine (server-driven state machine), agent tools, per-step context, session service and store interface |
 | `core/access/` | Identity, the single permission check, signed cookie, invitation codes |
 | `core/memory/`, `core/billing/` | Misconception map interface; cost estimate and daily session limit |
+| `core/review/` | The owner's session review: role resolution, review store interface, readable transcript |
 | `providers/model/` | `ModelProvider` interface, Claude adapter (plain HTTPS), scripted and offline providers |
 | `providers/postgres/` | Pool, `withIdentity` (sets `app.org_id`/`app.user_id` per transaction), PostgreSQL stores, invitations |
 | `modules/physics-1bac-sm/` | The lesson, its simulation (computation and React view) and its exercise generator |

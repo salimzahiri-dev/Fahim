@@ -1,4 +1,4 @@
-import { canAccessStudent, type Actor } from '../access/access';
+import { canAccessStudent, type StudentIdentity } from '../access/access';
 import { assertWithinDailyLimit, QUOTA_WINDOW_MS } from '../billing/quota';
 import { handleEvent, type EngineDeps } from './engine';
 import type { SessionStore, StoreScope } from './sessionStore';
@@ -79,7 +79,7 @@ export interface Progress {
 }
 
 /** What a student finds when they come back: their recent sessions and their misconception map. */
-export async function getProgress(actor: Actor, deps: SessionServiceDeps): Promise<Progress> {
+export async function getProgress(actor: StudentIdentity, deps: SessionServiceDeps): Promise<Progress> {
   const student = { orgId: actor.orgId, studentId: actor.studentId };
   if (!canAccessStudent(actor, student)) throw new SessionNotFoundError();
   const lessons = deps.engine.registries.lessons;
@@ -105,9 +105,9 @@ export async function getProgress(actor: Actor, deps: SessionServiceDeps): Promi
 }
 
 /** The identity a store call runs for: always the verified actor, never a value from the request. */
-const scopeOf = (actor: Actor): StoreScope => ({ orgId: actor.orgId, userId: actor.studentId });
+const scopeOf = (actor: StudentIdentity): StoreScope => ({ orgId: actor.orgId, userId: actor.studentId });
 
-export async function startSession(actor: Actor, lessonId: string, deps: SessionServiceDeps): Promise<PublicTurn> {
+export async function startSession(actor: StudentIdentity, lessonId: string, deps: SessionServiceDeps): Promise<PublicTurn> {
   if (!deps.engine.registries.lessons.has(lessonId)) throw new InvalidEventError(`Unknown lesson ${lessonId}`);
   if (deps.maxSessionsPerDay && deps.maxSessionsPerDay > 0) {
     // Checked before the first model call, so a refused session costs nothing.
@@ -122,7 +122,7 @@ export async function startSession(actor: Actor, lessonId: string, deps: Session
 }
 
 export async function sendSessionEvent(
-  actor: Actor,
+  actor: StudentIdentity,
   sessionId: string,
   event: ClientEvent,
   deps: SessionServiceDeps,

@@ -1,12 +1,13 @@
 import pg from 'pg';
-import { createInvitedStudent, findOrCreateOrganization, issueInvitation } from '../providers/postgres/invitations';
+import { createInvitedOwner, createInvitedStudent, findOrCreateOrganization, issueInvitation } from '../providers/postgres/invitations';
 
 /**
  * Operator tool (decision 0003): creates a student and prints their invitation
  * code, once. The code is not stored anywhere; only its hash is.
  *
  *   npm run invite -- --org "Pilote Fahim" --name "Élève 1"
- *   npm run invite -- --org "Pilote Fahim" --replace <student id>   (new code, old one revoked)
+ *   npm run invite -- --org "Pilote Fahim" --owner "Propriétaire"  (the review page account)
+ *   npm run invite -- --org "Pilote Fahim" --replace <user id>      (new code, old one revoked)
  *
  * Uses DATABASE_ADMIN_URL (owner connection).
  */
@@ -26,15 +27,21 @@ async function main(): Promise<void> {
   const orgName = arg('org');
   const name = arg('name');
   const replace = arg('replace');
-  if (!url || !orgName || (!name && !replace)) {
-    console.error('Usage: npm run invite -- --org "<organization>" (--name "<student>" | --replace <student id>). Needs DATABASE_ADMIN_URL.');
+  const owner = arg('owner');
+  if (!url || !orgName || (!name && !replace && !owner)) {
+    console.error(
+      'Usage: npm run invite -- --org "<organization>" (--name "<student>" | --owner "<name>" | --replace <user id>). Needs DATABASE_ADMIN_URL.',
+    );
     process.exit(1);
   }
   const admin = new pg.Client({ connectionString: url });
   await admin.connect();
   try {
     const orgId = await findOrCreateOrganization(admin, orgName, 'center');
-    if (replace) {
+    if (owner) {
+      const { userId, code } = await createInvitedOwner(admin, { orgId, displayName: owner });
+      console.log(`Owner ${userId} created in "${orgName}" (review page /revue). Code, shown only once:\n\n  ${code}\n`);
+    } else if (replace) {
       const code = await issueInvitation(admin, orgId, replace);
       console.log(`New code for student ${replace} (the previous one no longer works):\n\n  ${code}\n`);
     } else {

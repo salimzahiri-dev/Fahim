@@ -10,6 +10,8 @@ import type { ModelProvider } from '../../providers/model/ModelProvider';
 import { OfflineProvider } from '../../providers/model/offlineProvider';
 import { createPool } from '../../providers/postgres/db';
 import { PostgresInvitationDirectory } from '../../providers/postgres/invitations';
+import { PostgresAccountDirectory, PostgresReviewStore } from '../../providers/postgres/review';
+import { createReviewHandlers, type ReviewHandlers } from './review';
 import { PostgresMisconceptionStore, PostgresSessionStore } from '../../providers/postgres/stores';
 import { createSessionHandlers, type SessionHandlers } from './handlers';
 import { PILOT_LESSON_ID, PILOT_ORG_ID } from './pilot';
@@ -40,8 +42,14 @@ function modelProvider(env: Env, production: boolean): ModelProvider {
   return new ClaudeAdapter({ apiKey, baseUrl: env.ANTHROPIC_BASE_URL || undefined });
 }
 
-/** Builds the session API from an environment. Throws on a configuration that must not start. */
-export function buildSessionHandlers(env: Env = process.env): SessionHandlers {
+export interface Server {
+  sessions: SessionHandlers;
+  /** The owner's review pages; null without a database, where there is no owner account. */
+  review: ReviewHandlers | null;
+}
+
+/** Builds the server from an environment. Throws on a configuration that must not start. */
+export function buildServer(env: Env = process.env): Server {
   const config = loadConfig(env);
   const production = config.env === 'production';
   // With DATABASE_URL, sessions and the misconception map live in PostgreSQL; otherwise in memory.
@@ -49,8 +57,10 @@ export function buildSessionHandlers(env: Env = process.env): SessionHandlers {
   // Decision 0002: anonymous students exist in development only, and only without a database
   // (a student in the database comes from an invitation, decision 0003).
   const anonymous = !production && !db;
+  // One secret for every reader of the cookie.
+  const secret = cookieSecret(env, production);
 
-  return createSessionHandlers({
+  const sessions = createSessionHandlers({
     service: {
       engine: {
         model: modelProvider(env, production),
@@ -66,18 +76,36 @@ export function buildSessionHandlers(env: Env = process.env): SessionHandlers {
       newSessionId: randomUUID,
       maxSessionsPerDay: config.maxSessionsPerDay,
     },
-    cookieSecret: cookieSecret(env, production),
+    cookieSecret: secret,
     secureCookies: production,
     lessonId: PILOT_LESSON_ID,
     ...(db ? { invitations: new PostgresInvitationDirectory(db) } : {}),
     ...(!anonymous ? {} : { newStudent: () => ({ role: 'student' as const, orgId: PILOT_ORG_ID, studentId: randomUUID() }) }),
   });
+
+  const review = db
+    ? createReviewHandlers({ cookieSecret: secret, accounts: new PostgresAccountDirectory(db), review: new PostgresReviewStore(db) })
+    : null;
+  return { sessions, review };
+}
+
+/** The session API alone (kept for the tests that build it from an environment). */
+export function buildSessionHandlers(env: Env = process.env): SessionHandlers {
+  return buildServer(env).sessions;
 }
 
 // Kept on globalThis so development hot reloads do not drop the in-memory sessions.
-const holder = globalThis as typeof globalThis & { __fahimHandlers?: SessionHandlers };
+const holder = globalThis as typeof globalThis & { __fahimServer?: Server };
+
+function server(): Server {
+  holder.__fahimServer ??= buildServer();
+  return holder.__fahimServer;
+}
 
 export function getSessionHandlers(): SessionHandlers {
-  holder.__fahimHandlers ??= buildSessionHandlers();
-  return holder.__fahimHandlers;
+  return server().sessions;
+}
+
+export function getReviewHandlers(): ReviewHandlers | null {
+  return server().review;
 }

@@ -43,7 +43,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
   Done when: a fresh clone starts with one command and a session can be played.
 - [ ] D2. **(ask first)** Choose the host, deploy, set up a daily database backup copied to a second place.
   Done when: the pilot address works from a phone on mobile data and a restore from backup has been tried once.
-- [ ] D3. Owner-only page: list of sessions with step reached, cost and transcript, for the daily review during the pilot.
+- [x] D3. Owner-only page: list of sessions with step reached, cost and transcript, for the daily review during the pilot.
   Done when: the page is reachable only by the owner account and every view is written to `access_log`.
 - [ ] D4. **(owner task)** Pilot week: five students, three sessions each. Record completion rate, real cost per session, errors found, student feedback.
 
