@@ -3,6 +3,8 @@
 export interface Choice {
   id: string;
   label: string;
+  /** Same formula in LaTeX, for display only. The label stays the reference text. */
+  latex?: string;
   correct?: boolean;
   /** Misconception recorded automatically when the student picks this choice. */
   misconception?: string;

@@ -27,6 +27,8 @@ export interface SessionState {
   lawAttempts: number;
   exercise: ExerciseState | null;
   reversedRoleReplies: number;
+  /** Misconception codes recorded during this session, in order. The student's full map lives in MisconceptionStore. */
+  sessionMisconceptions: string[];
   transcript: Message[];
   usage: ModelUsage;
 }
@@ -38,13 +40,15 @@ export type SessionEvent =
   | { type: 'message'; text: string };
 
 export type UiAction =
-  | { type: 'show_choices'; kind: 'bet' | 'law'; choices: Array<{ id: string; label: string }> }
+  | { type: 'show_choices'; kind: 'bet' | 'law'; choices: Array<{ id: string; label: string; latex?: string }> }
   | { type: 'show_simulation'; simulationId: string; params: Record<string, unknown>; result: Record<string, unknown>; observe: string }
   | { type: 'show_exercise'; statement: string; values: Record<string, number> }
   | {
       type: 'show_summary';
       betLabel: string;
       betWasCorrect: boolean;
+      /** The law the student found, shown once the session is over. */
+      law: { label: string; latex?: string };
       exerciseAttempts: number;
       misconceptions: Array<{ code: string; label: string; seenCount: number }>;
     };
@@ -69,6 +73,7 @@ export function newSession(input: { sessionId: string; orgId: string; studentId:
     lawAttempts: 0,
     exercise: null,
     reversedRoleReplies: 0,
+    sessionMisconceptions: [],
     transcript: [],
     usage: { inputTokens: 0, outputTokens: 0 },
   };

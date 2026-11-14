@@ -19,9 +19,9 @@
   "law": {
     "question": "La masse n'a pas changé, seule la vitesse a doublé. Quelle formule explique la mesure ?",
     "choices": [
-      { "id": "a", "label": "Ec = m × v", "misconception": "EC_LINEAR_IN_V" },
-      { "id": "b", "label": "Ec = ½ × m × v²", "correct": true },
-      { "id": "c", "label": "Ec = ½ × m² × v", "misconception": "EC_LINEAR_IN_V" }
+      { "id": "a", "label": "Ec = m × v", "latex": "E_c = m \\times v", "misconception": "EC_LINEAR_IN_V" },
+      { "id": "b", "label": "Ec = ½ × m × v²", "latex": "E_c = \\tfrac{1}{2}\\, m\\, v^2", "correct": true },
+      { "id": "c", "label": "Ec = ½ × m² × v", "latex": "E_c = \\tfrac{1}{2}\\, m^2\\, v", "misconception": "EC_LINEAR_IN_V" }
     ],
     "guidance": [
       "Avec ta formule, que devient l'énergie si on double seulement la vitesse ?",

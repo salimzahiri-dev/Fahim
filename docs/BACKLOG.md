@@ -22,7 +22,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
   Done when: a full session can be played at 390 px wide and with the keyboard only.
 - [x] B4. Train simulation component (Canvas or SVG) driven only by the `params` and `result` of `show_simulation`: two speeds, two energy bars, the ratio.
   Done when: the component shows the values computed by the server and makes no network call.
-- [ ] B5. Exercise panel and end-of-session summary panel. Formulas rendered with KaTeX.
+- [x] B5. Exercise panel and end-of-session summary panel. Formulas rendered with KaTeX.
   Done when: the summary shows the bet, the attempts and the misconceptions recorded during the session.
 
 ## Stage C: accounts and persistence

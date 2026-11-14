@@ -83,6 +83,12 @@ export interface ToolContext {
   allowed: ToolName[];
   /** Set when check_answer ran during this turn. */
   flags: { answerChecked: boolean };
+  /**
+   * Codes already recorded during this turn. The server records the misconception of a
+   * button choice or a diagnosis itself; if the model records the same code in the same
+   * turn, that is the same event and must not count twice in the student's map.
+   */
+  recordedThisTurn: Set<string>;
 }
 
 export interface ToolOutcome {
@@ -98,6 +104,18 @@ function readString(input: Record<string, unknown>, key: string): string | null 
   if (keys.length !== 1 || keys[0] !== key) return null;
   const value = input[key];
   return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+/**
+ * The only way the session records a misconception: in the student's map, and
+ * in the session state so the summary shows what this session revealed.
+ */
+export async function recordMisconception(ctx: ToolContext, code: string): Promise<void> {
+  if (ctx.recordedThisTurn.has(code)) return;
+  ctx.recordedThisTurn.add(code);
+  const { state } = ctx;
+  await ctx.misconceptions.record(state.orgId, state.studentId, code);
+  if (!state.sessionMisconceptions.includes(code)) state.sessionMisconceptions.push(code);
 }
 
 export function launchSimulation(ctx: ToolContext): Record<string, unknown> {
@@ -127,7 +145,7 @@ export function generateExercise(ctx: ToolContext): { statement: string; values:
 }
 
 export async function checkAnswer(ctx: ToolContext, answer: string): Promise<Record<string, unknown>> {
-  const { lesson, registries, state, misconceptions, flags } = ctx;
+  const { registries, state, flags, lesson } = ctx;
   const exercise = state.exercise;
   if (!exercise) throw new Error('No exercise in progress');
   const generator = registries.generators.get(exercise.generatorId);
@@ -136,7 +154,7 @@ export async function checkAnswer(ctx: ToolContext, answer: string): Promise<Rec
   flags.answerChecked = true;
   if (diagnosis.code !== 'no_answer') exercise.attempts += 1;
   if (diagnosis.misconception) {
-    await misconceptions.record(state.orgId, state.studentId, diagnosis.misconception);
+    await recordMisconception(ctx, diagnosis.misconception);
   }
   if (!diagnosis.correct) {
     return { correct: false, diagnosis: diagnosis.code, guidance: diagnosis.hint, attempts: exercise.attempts };
@@ -192,7 +210,7 @@ export async function executeTool(name: string, input: Record<string, unknown>, 
         if (!ctx.lesson.misconceptions.some((m) => m.code === code)) {
           return fail(`Unknown code. Codes of the lesson: ${ctx.lesson.misconceptions.map((m) => m.code).join(', ')}.`);
         }
-        await ctx.misconceptions.record(ctx.state.orgId, ctx.state.studentId, code);
+        await recordMisconception(ctx, code);
         return ok({ recorded: code });
       }
     }

@@ -13,6 +13,7 @@ import {
   executeTool,
   generateExercise,
   launchSimulation,
+  recordMisconception,
   TOOL_DEFINITIONS,
   TOOLS_BY_STEP,
   type ToolContext,
@@ -121,7 +122,11 @@ function requireStep(state: SessionState, expected: SessionState['step'], event:
 }
 
 function publicChoices(lesson: Lesson, kind: 'bet' | 'law'): UiAction {
-  const choices = (kind === 'bet' ? lesson.trap.choices : lesson.law.choices).map((c) => ({ id: c.id, label: c.label }));
+  const choices = (kind === 'bet' ? lesson.trap.choices : lesson.law.choices).map((c) => ({
+    id: c.id,
+    label: c.label,
+    ...(c.latex ? { latex: c.latex } : {}),
+  }));
   return { type: 'show_choices', kind, choices };
 }
 
@@ -143,6 +148,7 @@ export async function handleEvent(current: SessionState, event: SessionEvent, de
     ui,
     allowed: [],
     flags: { answerChecked: false },
+    recordedThisTurn: new Set(),
   };
 
   /** Appends the model's messages, making sure the transcript always ends on a tutor message. */
@@ -181,7 +187,7 @@ export async function handleEvent(current: SessionState, event: SessionEvent, de
       if (!choice) throw new InvalidEventError(`Unknown bet choice ${event.choiceId}`);
       state.betChoiceId = choice.id;
       if (choice.misconception) {
-        await deps.misconceptions.record(state.orgId, state.studentId, choice.misconception);
+        await recordMisconception(ctx, choice.misconception);
       }
       state.step = 'experiment';
       tutorText = await run(`Je parie : ${choice.label}`, DIRECTIVES.betPlaced);
@@ -199,7 +205,7 @@ export async function handleEvent(current: SessionState, event: SessionEvent, de
       state.lawAttempts += 1;
       if (!choice.correct) {
         if (choice.misconception) {
-          await deps.misconceptions.record(state.orgId, state.studentId, choice.misconception);
+          await recordMisconception(ctx, choice.misconception);
         }
         tutorText = await run(`Je choisis : ${choice.label}`, DIRECTIVES.lawWrong(choice.label, state.lawAttempts));
         ui.push(publicChoices(lesson, 'law'));
@@ -267,11 +273,16 @@ export async function handleEvent(current: SessionState, event: SessionEvent, de
           if (last) {
             state.step = 'summary';
             const bet = lesson.trap.choices.find((c) => c.id === state.betChoiceId);
-            const recorded = await deps.misconceptions.list(state.orgId, state.studentId);
+            const law = lesson.law.choices.find((c) => c.correct);
+            // Only what this session revealed, with the student's running count for each.
+            const recorded = (await deps.misconceptions.list(state.orgId, state.studentId)).filter((r) =>
+              state.sessionMisconceptions.includes(r.code),
+            );
             ui.push({
               type: 'show_summary',
               betLabel: bet?.label ?? '',
               betWasCorrect: Boolean(bet?.correct),
+              law: { label: law?.label ?? '', ...(law?.latex ? { latex: law.latex } : {}) },
               exerciseAttempts: state.exercise?.attempts ?? 0,
               misconceptions: recorded.map((r) => ({
                 code: r.code,

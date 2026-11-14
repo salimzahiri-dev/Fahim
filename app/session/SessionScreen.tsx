@@ -7,6 +7,7 @@ import { errorMessage, splitTutorText, visibleStepIndex, VISIBLE_STEPS } from '.
 import { ExperimentArea } from './ExperimentArea';
 import { ExercisePanel } from './ExercisePanel';
 import { SummaryPanel } from './SummaryPanel';
+import { Formula } from './Formula';
 
 type ChoicesAction = Extract<UiAction, { type: 'show_choices' }>;
 type PanelAction = Exclude<UiAction, ChoicesAction>;
@@ -62,8 +63,13 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
       setSessionId(turn.sessionId);
       setStep(turn.step);
       const items: EntryBody[] = [];
+      // The exercise panel shows the statement; a tutor message that only repeats it is not shown twice.
+      const statements = new Set(turn.ui.flatMap((a) => (a.type === 'show_exercise' ? [a.statement.trim()] : [])));
       for (const message of turn.tutorText) {
-        for (const p of splitTutorText(message)) items.push({ kind: p.speaker, text: p.text });
+        for (const p of splitTutorText(message)) {
+          if (p.speaker === 'tutor' && statements.has(p.text)) continue;
+          items.push({ kind: p.speaker, text: p.text });
+        }
       }
       let nextChoices: ChoicesAction | null = null;
       for (const action of turn.ui) {
@@ -238,7 +244,7 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
                   onClick={() => pick(c.id, c.label)}
                   className="min-h-12 rounded-xl border-2 border-accent bg-white px-3 py-2 text-lg font-semibold text-accent-strong hover:bg-accent-soft disabled:opacity-50"
                 >
-                  {c.label}
+                  {c.latex ? <Formula latex={c.latex} label={c.label} /> : c.label}
                 </button>
               ))}
             </div>

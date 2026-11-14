@@ -221,6 +221,7 @@ describe('session engine', () => {
         type: 'show_summary',
         betLabel: '×2',
         betWasCorrect: false,
+        law: { label: 'Ec = ½ × m × v²', latex: 'E_c = \\tfrac{1}{2}\\, m\\, v^2' },
         exerciseAttempts: 1,
         misconceptions: [
           { code: 'EC_LINEAR_IN_V', label: "L'énergie cinétique est proportionnelle à la vitesse", seenCount: 1 },
@@ -232,6 +233,62 @@ describe('session engine', () => {
     const after = await handleEvent(second.state, { type: 'message', text: 'merci' }, deps);
     expect(after.state.step).toBe('summary');
     expect(model.requests.at(-1)!.tools).toEqual([]);
+  });
+
+  it('counts a misconception once per turn when the server and the model both record it', async () => {
+    const { deps, state, misconceptions } = setup([
+      say('piège'),
+      say('Pari noté.'),
+      callTool('record_misconception', { code: 'EC_LINEAR_IN_V' }), // same event as the formula the server just recorded
+      say('Teste ta formule.'),
+      say('Bravo.'),
+      callTool('check_answer', { answer: '3110,4' }), // the server records SPEED_UNIT_KMH from the diagnosis
+      callTool('record_misconception', { code: 'SPEED_UNIT_KMH' }), // the model records it again
+      say('Regarde ton unité.'),
+    ]);
+    let s = (await handleEvent(state, { type: 'start' }, deps)).state;
+    s = (await handleEvent(s, { type: 'bet', choiceId: 'x2' }, deps)).state; // 1st time: the bet
+    s = (await handleEvent(s, { type: 'law_choice', choiceId: 'a' }, deps)).state; // 2nd time: the formula
+    s = (await handleEvent(s, { type: 'law_choice', choiceId: 'b' }, deps)).state;
+    await handleEvent(s, { type: 'message', text: '3110,4' }, deps);
+    expect(await misconceptions.list('org1', 'stu1')).toEqual([
+      { code: 'EC_LINEAR_IN_V', seenCount: 2, status: 'in_progress' },
+      { code: 'SPEED_UNIT_KMH', seenCount: 1, status: 'new' },
+    ]);
+  });
+
+  it('summarizes only the misconceptions of this session, with the running count', async () => {
+    const { deps, state, misconceptions } = setup([
+      say('piège'), say('Pari noté.'), say('Bravo.'),
+      callTool('check_answer', { answer: '3110,4' }),
+      say('Regarde ton unité.'),
+      callTool('check_answer', { answer: '240' }),
+      say('Exact. Sami : …'),
+      say('Sami : Pourquoi ?'),
+      say('Sami : Ah oui ! Séance terminée.'),
+    ]);
+    // An earlier session left two misconceptions in the student's map.
+    await misconceptions.record('org1', 'stu1', 'BRAKING_LINEAR_IN_V');
+    await misconceptions.record('org1', 'stu1', 'SPEED_UNIT_KMH');
+
+    let s = await toExercise(deps, state); // bet x2 records EC_LINEAR_IN_V
+    s = (await handleEvent(s, { type: 'message', text: '3110,4' }, deps)).state; // speed not converted
+    s = (await handleEvent(s, { type: 'message', text: '240' }, deps)).state;
+    s = (await handleEvent(s, { type: 'message', text: 'Je ne sais pas' }, deps)).state;
+    const end = await handleEvent(s, { type: 'message', text: 'Ec ×4 donc d ×4' }, deps);
+
+    expect(end.state.sessionMisconceptions).toEqual(['EC_LINEAR_IN_V', 'SPEED_UNIT_KMH']);
+    const summary = end.ui.find((a) => a.type === 'show_summary');
+    expect(summary).toMatchObject({
+      exerciseAttempts: 2,
+      misconceptions: [
+        { code: 'SPEED_UNIT_KMH', seenCount: 2 },
+        { code: 'EC_LINEAR_IN_V', seenCount: 1 },
+      ],
+    });
+    // Still in the map for later sessions, but not part of this session's summary.
+    expect((await misconceptions.list('org1', 'stu1')).map((m) => m.code)).toContain('BRAKING_LINEAR_IN_V');
+    expect(JSON.stringify(summary)).not.toContain('BRAKING_LINEAR_IN_V');
   });
 
   it('keeps a valid alternating transcript and accumulates usage', async () => {
