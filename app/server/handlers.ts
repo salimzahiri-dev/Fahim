@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { DailyLimitError } from '../../core/billing/quota';
 import type { StudentIdentity } from '../../core/access/access';
 import { hashInvitationCode, normalizeInvitationCode, type InvitationDirectory } from '../../core/access/invitationCode';
 import {
@@ -47,6 +48,7 @@ type ErrorCode =
   | 'invalid_event'
   | 'not_found'
   | 'conflict'
+  | 'daily_limit'
   | 'lesson_not_validated'
   | 'server_error';
 
@@ -58,6 +60,7 @@ const STATUS: Record<ErrorCode, number> = {
   not_found: 404,
   lesson_not_validated: 503,
   conflict: 409,
+  daily_limit: 429,
   server_error: 500,
 };
 
@@ -70,6 +73,7 @@ function error(code: ErrorCode): Response {
 function mapError(err: unknown): Response {
   if (err instanceof SessionNotFoundError) return error('not_found');
   if (err instanceof SessionConflictError) return error('conflict');
+  if (err instanceof DailyLimitError) return error('daily_limit');
   if (err instanceof InvalidEventError) return error('invalid_event');
   if (err instanceof LessonNotValidatedError) return error('lesson_not_validated');
   // Details stay on the server and carry no student content.

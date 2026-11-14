@@ -4,6 +4,8 @@ export interface FahimConfig {
   maxTokens: number;
   priceInputPerMTok: number;
   priceOutputPerMTok: number;
+  /** Sessions a student may start in 24 hours. 0 means no limit. */
+  maxSessionsPerDay: number;
   env: 'development' | 'production';
 }
 
@@ -18,6 +20,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): FahimConfig {
     maxTokens: num(env.FAHIM_MAX_TOKENS, 1024),
     priceInputPerMTok: num(env.FAHIM_PRICE_INPUT_PER_MTOK, 2),
     priceOutputPerMTok: num(env.FAHIM_PRICE_OUTPUT_PER_MTOK, 10),
+    maxSessionsPerDay: num(env.FAHIM_MAX_SESSIONS_PER_DAY, 3),
     env: env.NODE_ENV === 'production' ? 'production' : 'development',
   };
 }

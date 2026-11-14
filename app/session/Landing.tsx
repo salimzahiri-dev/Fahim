@@ -24,12 +24,15 @@ function signInError(code: string | undefined): string {
 export function Landing({
   lessonTitle,
   needsSignIn,
+  notice,
   starting,
   onStart,
   onSignedIn,
 }: {
   lessonTitle: string;
   needsSignIn: boolean;
+  /** Why the last attempt to start a session failed, if it did. */
+  notice: string | null;
   starting: boolean;
   onStart: () => void;
   onSignedIn: () => void;
@@ -89,6 +92,12 @@ export function Landing({
       <p className="text-lg text-muted">
         Tu paries d&apos;abord, l&apos;expérience tranche, puis tu trouves la loi toi-même. Compte 10 à 15 minutes.
       </p>
+
+      {notice && (
+        <p role="alert" className="rounded-xl border border-[#e0b24a] bg-[#fff8e6] px-4 py-3 text-[#6b4700]">
+          {notice}
+        </p>
+      )}
 
       {needsSignIn && !progress ? (
         <form onSubmit={(e) => void signIn(e)} className="grid gap-3" aria-labelledby="sign-in-title">

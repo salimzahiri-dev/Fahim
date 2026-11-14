@@ -59,6 +59,8 @@ export function visibleStepIndex(step: string): number {
 /** Error codes of the session API, explained to the student. */
 export function errorMessage(code: string | undefined): string {
   switch (code) {
+    case 'daily_limit':
+      return 'Tu as fait toutes tes séances pour aujourd’hui. Reviens demain pour la suite.';
     case 'conflict':
       return 'Ta réponse précédente était encore en cours. Réessaie.';
     case 'not_found':

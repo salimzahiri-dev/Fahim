@@ -27,6 +27,8 @@ export interface SessionStore {
   save(scope: StoreScope, state: SessionState): Promise<void>;
   /** The sessions of one student, most recent first. */
   listForStudent(scope: StoreScope, studentId: string, limit: number): Promise<SessionSummary[]>;
+  /** Sessions the student started at or after `since` (ISO 8601), for the daily limit. */
+  countStartedSince(scope: StoreScope, studentId: string, since: string): Promise<number>;
 }
 
 export interface SessionSummary {
@@ -42,11 +44,19 @@ export class InMemorySessionStore implements SessionStore {
   private readonly sessions = new Map<string, SessionState>();
   private readonly times = new Map<string, { startedAt: string; endedAt: string | null }>();
 
+  constructor(private readonly now: () => Date = () => new Date()) {}
+
+  async countStartedSince(scope: StoreScope, studentId: string, since: string): Promise<number> {
+    return [...this.sessions.values()].filter(
+      (s) => s.orgId === scope.orgId && s.studentId === studentId && this.times.get(s.sessionId)!.startedAt >= since,
+    ).length;
+  }
+
   async create(scope: StoreScope, state: SessionState): Promise<void> {
     if (state.orgId !== scope.orgId) throw new Error('Session belongs to another organization');
     if (this.sessions.has(state.sessionId)) throw new Error('Session already exists');
     this.sessions.set(state.sessionId, { ...structuredClone(state), revision: 0 });
-    this.times.set(state.sessionId, { startedAt: new Date().toISOString(), endedAt: null });
+    this.times.set(state.sessionId, { startedAt: this.now().toISOString(), endedAt: null });
   }
 
   async listForStudent(scope: StoreScope, studentId: string, limit: number): Promise<SessionSummary[]> {
@@ -70,6 +80,6 @@ export class InMemorySessionStore implements SessionStore {
     if (existing.revision !== state.revision) throw new SessionConflictError();
     this.sessions.set(state.sessionId, { ...structuredClone(state), revision: state.revision + 1 });
     const times = this.times.get(state.sessionId)!;
-    if (state.step === 'summary' && !times.endedAt) times.endedAt = new Date().toISOString();
+    if (state.step === 'summary' && !times.endedAt) times.endedAt = this.now().toISOString();
   }
 }

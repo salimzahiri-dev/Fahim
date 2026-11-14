@@ -47,6 +47,7 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
   const [pending, setPending] = useState(false);
   const [fatal, setFatal] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const choicesRef = useRef<HTMLDivElement>(null);
@@ -106,10 +107,13 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
     setChoices(null);
     setFatal(false);
     setStep('trap');
+    setNotice(null);
     const result = await call('/api/sessions');
     setPending(false);
     if (result.ok) applyTurn(result.turn);
-    else fail(result.code);
+    else if (result.code === 'unauthenticated') fail(result.code);
+    // A session that could not start stays on the first screen, with the reason.
+    else setNotice(errorMessage(result.code));
   }, [applyTurn, fail]);
 
   const send = useCallback(
@@ -177,6 +181,7 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
       <Landing
         lessonTitle={lessonTitle}
         needsSignIn={needsSignIn}
+        notice={notice}
         starting={pending}
         onStart={() => void start()}
         onSignedIn={() => setNeedsSignIn(false)}

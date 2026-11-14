@@ -34,7 +34,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
   Done when: the full-loop route tests pass against PostgreSQL and a session survives a server restart.
 - [x] C3. **(ask first)** Sign-in for the pilot: five students, invitation codes, one organization. Choose the authentication library and record the decision.
   Done when: a student signs in with a code, finds their progress the next day, and cannot open another student's session.
-- [ ] C4. Quotas and cost: a limit on sessions per student per day, and the cost of each session stored from the reported usage.
+- [x] C4. Quotas and cost: a limit on sessions per student per day, and the cost of each session stored from the reported usage.
   Done when: the limit is enforced by a test and the stored cost matches the usage of the session.
 
 ## Stage D: ship the pilot
