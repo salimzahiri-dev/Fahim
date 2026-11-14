@@ -28,7 +28,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
 
 ## Stage C: accounts and persistence
 
-- [ ] C1. PostgreSQL migrations for `organizations`, `users`, `memberships`, `student_profiles`, `sessions`, `messages`, `misconceptions`, `access_log`, each data table with `org_id`, row-level security and an isolation test. A local database runs in Docker for tests.
+- [x] C1. PostgreSQL migrations for `organizations`, `users`, `memberships`, `student_profiles`, `sessions`, `messages`, `misconceptions`, `access_log`, each data table with `org_id`, row-level security and an isolation test. A local database runs in Docker for tests.
   Done when: isolation tests prove a user of one organization can neither read nor write another's rows, using a non-owner database role.
 - [ ] C2. PostgreSQL implementations of `SessionStore` and `MisconceptionStore`, setting `app.user_id` and `app.org_id` with `SET LOCAL` in each transaction.
   Done when: the full-loop route tests pass against PostgreSQL and a session survives a server restart.

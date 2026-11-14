@@ -70,6 +70,7 @@ Pages contain no business logic: they call `/core`. The front end can then be se
 /providers
   /model               ModelProvider interface + Claude adapter
   /storage             interface + S3-compatible adapter
+  /postgres            pool, withIdentity (sets app.org_id/app.user_id per transaction), PostgreSQL stores
   /mail, /payment      interfaces, adapters later
 /modules
   /physics-1bac-sm     manifest, lessons, simulations, generators
@@ -77,8 +78,10 @@ Pages contain no business logic: they call `/core`. The front end can then be se
 /db
   /migrations          numbered SQL files
   /policies            row-level security policies, one file per table
+  migrate.ts           applies pending migrations, then re-applies every policy file
 /tests
-  /isolation           one organization never reads another
+  /unit                offline tests (npm test)
+  /db                  isolation and storage tests against PostgreSQL in Docker (npm run test:db)
   /bench               simulated students against the tutor
 ```
 

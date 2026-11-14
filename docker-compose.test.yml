@@ -1,0 +1,17 @@
+# Throwaway PostgreSQL for the database tests (npm run test:db). Data lives in memory only.
+# The password is a local test value, not a secret: the port is bound to 127.0.0.1.
+services:
+  fahim-test-db:
+    image: postgres:17-alpine
+    container_name: fahim-test-db
+    environment:
+      POSTGRES_PASSWORD: fahim_test_only
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 1s
+      timeout: 3s
+      retries: 30

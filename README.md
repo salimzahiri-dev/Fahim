@@ -58,3 +58,15 @@ In the terminal chat, type a choice id (`x2`, `b`) to press a button, anything e
 1. Run the bench, read the six transcripts, fix the prompt.
 2. Have a 1re bac SM physics teacher review the lesson file.
 3. Add the web interface (Next.js) on top of `handleEvent`, then PostgreSQL storage behind the existing interfaces.
+
+## Database tests
+
+The isolation tests run against a throwaway PostgreSQL in Docker (data in memory, port 55432 on 127.0.0.1):
+
+```bash
+npm run db:test:up     # start the test database
+npm run test:db        # migrations + row-level security isolation tests
+npm run db:test:down   # stop it
+```
+
+Migrations are numbered SQL files in `db/migrations`; row-level security policies are in `db/policies`, one file per table. `npm run db:migrate` applies both with `DATABASE_ADMIN_URL`.

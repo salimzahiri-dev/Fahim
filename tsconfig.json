@@ -33,8 +33,11 @@
     "core",
     "providers",
     "modules",
+    "db",
     "scripts",
     "tests",
+    "vitest.config.ts",
+    "vitest.db.config.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],

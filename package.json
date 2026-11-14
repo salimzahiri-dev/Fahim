@@ -13,11 +13,16 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "chat": "tsx scripts/chat.ts",
-    "bench": "tsx tests/bench/run.ts"
+    "bench": "tsx tests/bench/run.ts",
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "db:test:up": "docker compose -f docker-compose.test.yml up -d --wait",
+    "db:test:down": "docker compose -f docker-compose.test.yml down",
+    "db:migrate": "tsx db/migrate.ts"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "tailwindcss": "^4.3.5",
@@ -28,6 +33,7 @@
   "dependencies": {
     "katex": "^0.19.1",
     "next": "^16.4.6",
+    "pg": "^8.23.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   }
