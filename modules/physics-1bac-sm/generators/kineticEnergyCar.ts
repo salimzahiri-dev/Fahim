@@ -69,7 +69,7 @@ function diagnose(values: Record<string, number>, value: number, unit: 'kJ' | 'J
 
   if (unit === 'J') {
     if (close(value, expected * 1000)) {
-      return { correct: true, code: 'correct_in_joules', hint: 'Right answer, given in joules. Remind them of the conversion to kJ.' };
+      return { correct: true, code: 'correct_in_joules', convertTo: 'kJ', hint: 'Right value, given in joules instead of kJ.' };
     }
   } else if (close(value, expected)) {
     return { correct: true, code: 'correct', hint: 'Right answer.' };

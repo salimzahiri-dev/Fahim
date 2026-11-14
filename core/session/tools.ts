@@ -139,7 +139,14 @@ export function generateExercise(ctx: ToolContext): { statement: string; values:
   const generator = registries.generators.get(lesson.exercise.generatorId);
   if (!generator) throw new Error(`Generator not registered: ${lesson.exercise.generatorId}`);
   const drawn = generator.generate(rng);
-  state.exercise = { generatorId: generator.id, values: drawn.values, statement: drawn.statement, attempts: 0, solved: false };
+  state.exercise = {
+    generatorId: generator.id,
+    values: drawn.values,
+    statement: drawn.statement,
+    attempts: 0,
+    solved: false,
+    conversionAsked: false,
+  };
   ui.push({ type: 'show_exercise', statement: drawn.statement, values: drawn.values });
   return drawn;
 }
@@ -152,22 +159,46 @@ export async function checkAnswer(ctx: ToolContext, answer: string): Promise<Rec
   if (!generator) throw new Error(`Generator not registered: ${exercise.generatorId}`);
   const diagnosis = generator.check(exercise.values, answer);
   flags.answerChecked = true;
-  if (diagnosis.code !== 'no_answer') exercise.attempts += 1;
+  const gaveValue = diagnosis.code !== 'no_answer';
+  // The reply to a conversion request is not a new attempt: the value was already right.
+  const conversionReply = exercise.conversionAsked && gaveValue;
+  if (gaveValue && !conversionReply) exercise.attempts += 1;
   if (diagnosis.misconception) {
     await recordMisconception(ctx, diagnosis.misconception);
   }
-  if (!diagnosis.correct) {
-    return { correct: false, diagnosis: diagnosis.code, guidance: diagnosis.hint, attempts: exercise.attempts };
-  }
-  exercise.solved = true;
-  return {
-    correct: true,
-    diagnosis: diagnosis.code,
-    guidance: diagnosis.hint,
-    attempts: exercise.attempts,
-    solution: generator.solution(exercise.values),
-    next: `Confirm in one sentence using the solution above. Then announce the reversed role: the student becomes the teacher. Then write, in a separate paragraph that starts with "Sami : ", this exact sentence: ${lesson.reversedRole.samiLine}`,
+  const solved = (guidance: string) => {
+    exercise.solved = true;
+    return {
+      correct: true,
+      solved: true,
+      diagnosis: diagnosis.code,
+      guidance,
+      attempts: exercise.attempts,
+      solution: generator.solution(exercise.values),
+      next: `Confirm in one sentence using the solution above. Then announce the reversed role: the student becomes the teacher. Then write, in a separate paragraph that starts with "Sami : ", this exact sentence: ${lesson.reversedRole.samiLine}`,
+    };
   };
+
+  if (conversionReply) {
+    // Asked once only: whatever the reply, the exercise is solved and the code's solution shows the conversion.
+    return diagnosis.correct && !diagnosis.convertTo
+      ? solved('The student converted the value correctly.')
+      : solved('The conversion is still missing or wrong. Show it with the solution above, without blaming.');
+  }
+  if (diagnosis.correct && diagnosis.convertTo && !exercise.conversionAsked) {
+    exercise.conversionAsked = true;
+    return {
+      correct: true,
+      solved: false,
+      diagnosis: diagnosis.code,
+      guidance: `${diagnosis.hint} The value is right. Ask the student, once, to give it in ${diagnosis.convertTo}. Do not convert it yourself and do not write the converted value.`,
+      attempts: exercise.attempts,
+    };
+  }
+  if (!diagnosis.correct) {
+    return { correct: false, solved: false, diagnosis: diagnosis.code, guidance: diagnosis.hint, attempts: exercise.attempts };
+  }
+  return solved(diagnosis.hint);
 }
 
 export async function executeTool(name: string, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutcome> {

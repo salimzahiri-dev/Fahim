@@ -11,6 +11,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
   Done when: six profiles reach `summary` with no blocking flag on two consecutive runs, and the transcripts read well. Bench summary attached to the report.
 - [ ] A2. **(owner task)** Have a 1re bac SM physics teacher review `modules/physics-1bac-sm/lessons/work-kinetic-energy.json`.
   Done when: corrections are applied and `validated` is `true`, with the reviewer and date noted in a decision record.
+  The teacher also confirms the rule for an answer in joules (decision 0004): a correct value in J counts as right, the tutor asks once for the value in kJ without converting it, and that reply is not a new attempt.
 
 ## Stage B: web interface for one session
 

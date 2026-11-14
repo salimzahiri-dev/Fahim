@@ -22,3 +22,8 @@ Backlog B2 asks for an HTTP API around `handleEvent`, with the student identity 
 - Clearing cookies starts a new anonymous student: acceptable for development, replaced by real sign-in in C3.
 - The per-session lock holds within one process. With several server processes, the PostgreSQL store (C2) must lock the session row in its transaction.
 - In development, a server restart invalidates cookies and in-memory sessions together.
+
+## Amendment (2026-11-14, owner)
+
+- The anonymous student of decision 2 is accepted **for development only**. In production, `POST /api/sessions` without a valid cookie answers 401 and sets no cookie (`app/server/runtime.ts` passes no `newStudent`). Tested in `tests/unit/runtime.test.ts`.
+- The offline model provider (`FAHIM_MODEL_PROVIDER=offline`) stays, for development only: the server refuses to start with it in production. Tested in the same file.

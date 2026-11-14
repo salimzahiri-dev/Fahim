@@ -25,9 +25,15 @@ export class OfflineProvider implements ModelProvider {
     const checked = request.systemPrompt.includes("The server has checked the student's answer");
     let text = LINES[step] ?? LINES.summary!;
     if (checked) {
-      text = request.systemPrompt.includes('"correct":true')
-        ? '[Mode hors ligne] Réponse vérifiée : c’est juste. Maintenant, c’est toi le prof.\n\nSami : Si je roule deux fois plus vite, il me faut deux fois plus de distance pour freiner, non ?'
-        : '[Mode hors ligne] Réponse vérifiée : ce n’est pas encore ça. Reprends ton calcul étape par étape.';
+      const prompt = request.systemPrompt;
+      if (prompt.includes('"solved":true')) {
+        text =
+          '[Mode hors ligne] Réponse vérifiée : c’est juste. Maintenant, c’est toi le prof.\n\nSami : Si je roule deux fois plus vite, il me faut deux fois plus de distance pour freiner, non ?';
+      } else if (prompt.includes('"correct":true')) {
+        text = '[Mode hors ligne] La valeur est juste, mais l’énoncé demande des kJ. Peux-tu la convertir ?';
+      } else {
+        text = '[Mode hors ligne] Réponse vérifiée : ce n’est pas encore ça. Reprends ton calcul étape par étape.';
+      }
     }
     return { content: [{ type: 'text', text }], stopReason: 'end', usage: { inputTokens: 0, outputTokens: 0 } };
   }

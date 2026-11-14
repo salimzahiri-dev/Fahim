@@ -9,6 +9,8 @@ export interface ExerciseState {
   statement: string;
   attempts: number;
   solved: boolean;
+  /** True once the student has been asked to convert a correct value into the requested unit. */
+  conversionAsked: boolean;
 }
 
 /**

@@ -9,6 +9,11 @@ export interface Diagnosis {
   code: string;
   /** Misconception recorded automatically when the error reveals one. */
   misconception?: string;
+  /**
+   * Set on a correct value given in another unit than the one asked (for example "J" when
+   * "kJ" is asked). The session asks the student once to convert it; see checkAnswer.
+   */
+  convertTo?: string;
   /** Guidance for the tutor model. Never contains the expected value unless the answer is correct. */
   hint: string;
 }

@@ -27,10 +27,10 @@ export interface HandlerDeps {
   secureCookies: boolean;
   lessonId: string;
   /**
-   * Identity given to a browser that has none yet. The pilot has no sign-in
-   * (backlog C3): the server mints an anonymous student in the pilot organization.
+   * Development only (decision 0002): identity given to a browser that has none yet.
+   * Absent in production, where a session without sign-in is refused.
    */
-  newStudent: () => StudentIdentity;
+  newStudent?: () => StudentIdentity;
 }
 
 type ErrorCode = 'unauthenticated' | 'invalid_event' | 'not_found' | 'lesson_not_validated' | 'server_error';
@@ -76,6 +76,7 @@ export function createSessionHandlers(deps: HandlerDeps) {
       let actor = identify(request);
       const headers = new Headers(NO_STORE);
       if (!actor) {
+        if (!deps.newStudent) return error('unauthenticated');
         actor = deps.newStudent();
         headers.append('set-cookie', studentCookieHeader(signStudentCookie(actor, deps.cookieSecret), deps.secureCookies));
       }

@@ -112,7 +112,7 @@ describe('session engine', () => {
 
     const right = await handleEvent(wrong.state, { type: 'law_choice', choiceId: 'b' }, deps);
     expect(right.state.step).toBe('exercise');
-    expect(right.state.exercise).toMatchObject({ values: { massKg: 1200, speedKmh: 72 }, attempts: 0, solved: false });
+    expect(right.state.exercise).toMatchObject({ values: { massKg: 1200, speedKmh: 72 }, attempts: 0, solved: false, conversionAsked: false });
     expect(right.ui).toContainEqual({
       type: 'show_exercise',
       statement: 'Une voiture de masse 1 200 kg roule à 72 km/h. Quelle est son énergie cinétique, en kJ ?',
