@@ -8,6 +8,7 @@ import { ExperimentArea } from './ExperimentArea';
 import { ExercisePanel } from './ExercisePanel';
 import { SummaryPanel } from './SummaryPanel';
 import { Formula } from './Formula';
+import { Landing } from './Landing';
 
 type ChoicesAction = Extract<UiAction, { type: 'show_choices' }>;
 type PanelAction = Exclude<UiAction, ChoicesAction>;
@@ -45,6 +46,7 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
   const [fatal, setFatal] = useState(false);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const choicesRef = useRef<HTMLDivElement>(null);
@@ -84,8 +86,16 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
 
   const fail = useCallback(
     (code?: string) => {
+      if (code === 'unauthenticated') {
+        // No valid sign-in: back to the first screen, which asks for the invitation code.
+        setSessionId(null);
+        setEntries([]);
+        setChoices(null);
+        setNeedsSignIn(true);
+        return;
+      }
       add([{ kind: 'error', text: errorMessage(code) }]);
-      if (code === 'not_found' || code === 'unauthenticated' || code === 'lesson_not_validated') setFatal(true);
+      if (code === 'not_found' || code === 'lesson_not_validated') setFatal(true);
     },
     [add],
   );
@@ -164,21 +174,13 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
 
   if (!sessionId && entries.length === 0) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center gap-6 px-4 py-10">
-        <p className="text-sm font-semibold uppercase tracking-wide text-accent">Fahim · Physique 1re bac SM</p>
-        <h1 className="text-3xl font-bold leading-tight">{lessonTitle}</h1>
-        <p className="text-lg text-muted">
-          Tu paries d&apos;abord, l&apos;expérience tranche, puis tu trouves la loi toi-même. Compte 10 à 15 minutes.
-        </p>
-        <button
-          type="button"
-          onClick={() => void start()}
-          disabled={pending}
-          className="min-h-12 rounded-xl bg-accent px-6 text-lg font-semibold text-white hover:bg-accent-strong disabled:opacity-60"
-        >
-          {pending ? 'Ouverture…' : 'Commencer la séance'}
-        </button>
-      </main>
+      <Landing
+        lessonTitle={lessonTitle}
+        needsSignIn={needsSignIn}
+        starting={pending}
+        onStart={() => void start()}
+        onSignedIn={() => setNeedsSignIn(false)}
+      />
     );
   }
 

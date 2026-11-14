@@ -9,6 +9,7 @@ import { ClaudeAdapter } from '../../providers/model/claudeAdapter';
 import type { ModelProvider } from '../../providers/model/ModelProvider';
 import { OfflineProvider } from '../../providers/model/offlineProvider';
 import { createPool } from '../../providers/postgres/db';
+import { PostgresInvitationDirectory } from '../../providers/postgres/invitations';
 import { PostgresMisconceptionStore, PostgresSessionStore } from '../../providers/postgres/stores';
 import { createSessionHandlers, type SessionHandlers } from './handlers';
 import { PILOT_LESSON_ID, PILOT_ORG_ID } from './pilot';
@@ -67,6 +68,7 @@ export function buildSessionHandlers(env: Env = process.env): SessionHandlers {
     cookieSecret: cookieSecret(env, production),
     secureCookies: production,
     lessonId: PILOT_LESSON_ID,
+    ...(db ? { invitations: new PostgresInvitationDirectory(db) } : {}),
     ...(!anonymous ? {} : { newStudent: () => ({ role: 'student' as const, orgId: PILOT_ORG_ID, studentId: randomUUID() }) }),
   });
 }

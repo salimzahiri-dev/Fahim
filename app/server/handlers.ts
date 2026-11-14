@@ -1,5 +1,8 @@
+import { createHmac } from 'node:crypto';
 import type { StudentIdentity } from '../../core/access/access';
+import { hashInvitationCode, normalizeInvitationCode, type InvitationDirectory } from '../../core/access/invitationCode';
 import {
+  clearStudentCookieHeader,
   readCookie,
   signStudentCookie,
   STUDENT_COOKIE,
@@ -7,6 +10,7 @@ import {
   verifyStudentCookie,
 } from '../../core/access/studentCookie';
 import {
+  getProgress,
   parseClientEvent,
   sendSessionEvent,
   SessionNotFoundError,
@@ -32,12 +36,24 @@ export interface HandlerDeps {
    * Absent in production, where a session without sign-in is refused.
    */
   newStudent?: () => StudentIdentity;
+  /** Invitation codes (decision 0003). Without it, sign-in is not offered. */
+  invitations?: InvitationDirectory;
 }
 
-type ErrorCode = 'unauthenticated' | 'invalid_event' | 'not_found' | 'conflict' | 'lesson_not_validated' | 'server_error';
+type ErrorCode =
+  | 'unauthenticated'
+  | 'invalid_code'
+  | 'too_many_attempts'
+  | 'invalid_event'
+  | 'not_found'
+  | 'conflict'
+  | 'lesson_not_validated'
+  | 'server_error';
 
 const STATUS: Record<ErrorCode, number> = {
   unauthenticated: 401,
+  invalid_code: 401,
+  too_many_attempts: 429,
   invalid_event: 400,
   not_found: 404,
   lesson_not_validated: 503,
@@ -104,7 +120,60 @@ export function createSessionHandlers(deps: HandlerDeps) {
         return mapError(err);
       }
     },
+
+    /** POST /api/sign-in { code }: exchanges an invitation code for the signed cookie. */
+    async signIn(request: Request): Promise<Response> {
+      if (!deps.invitations) return error('not_found');
+      const body = await readJson(request);
+      const typed =
+        typeof body === 'object' && body !== null && !Array.isArray(body) && Object.keys(body).join() === 'code'
+          ? (body as { code: unknown }).code
+          : null;
+      if (typeof typed !== 'string' || typed.length > 64) return error('invalid_event');
+      const canonical = normalizeInvitationCode(typed);
+      try {
+        // A string that cannot be a code still counts as a failed attempt, under an impossible hash.
+        const hash = canonical ? hashInvitationCode(canonical) : Buffer.alloc(32);
+        const result = await deps.invitations.signIn(hash, clientKey(request, deps.cookieSecret));
+        if (result.status === 'locked') return error('too_many_attempts');
+        if (result.status !== 'ok') return error('invalid_code');
+        const headers = new Headers(NO_STORE);
+        headers.append('set-cookie', studentCookieHeader(signStudentCookie(result.identity, deps.cookieSecret), deps.secureCookies));
+        return Response.json({ signedIn: true }, { headers });
+      } catch (err) {
+        return mapError(err);
+      }
+    },
+
+    /** POST /api/sign-out: forgets the cookie on this device. */
+    async signOut(): Promise<Response> {
+      const headers = new Headers(NO_STORE);
+      headers.append('set-cookie', clearStudentCookieHeader(deps.secureCookies));
+      return Response.json({ signedIn: false }, { headers });
+    },
+
+    /** GET /api/progress: the signed-in student's recent sessions and misconception map. */
+    async progress(request: Request): Promise<Response> {
+      const actor = identify(request);
+      if (!actor) return error('unauthenticated');
+      try {
+        return Response.json(await getProgress(actor, deps.service), { headers: NO_STORE });
+      } catch (err) {
+        return mapError(err);
+      }
+    },
   };
+}
+
+/**
+ * Identifies the client for the failed-attempt limit without storing its address:
+ * an HMAC of the address the reverse proxy reports. Without a proxy header every
+ * client shares one bucket, which fails closed.
+ */
+function clientKey(request: Request, secret: string): string {
+  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const address = forwarded || request.headers.get('x-real-ip')?.trim() || 'unknown';
+  return createHmac('sha256', secret).update(`sign-in:${address}`).digest('hex');
 }
 
 export type SessionHandlers = ReturnType<typeof createSessionHandlers>;

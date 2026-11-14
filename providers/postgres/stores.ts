@@ -1,5 +1,5 @@
 import type { MisconceptionRecord, MisconceptionStore } from '../../core/memory/misconceptionStore';
-import { SessionConflictError, type SessionStore, type StoreScope } from '../../core/session/sessionStore';
+import { SessionConflictError, type SessionStore, type SessionSummary, type StoreScope } from '../../core/session/sessionStore';
 import type { SessionState } from '../../core/session/types';
 import { withIdentity, type Db } from './db';
 
@@ -48,6 +48,22 @@ export class PostgresSessionStore implements SessionStore {
       ),
     );
     if (result.rowCount !== 1) throw new SessionConflictError();
+  }
+
+  async listForStudent(scope: StoreScope, studentId: string, limit: number): Promise<SessionSummary[]> {
+    const result = await withIdentity(this.db, scope, (c) =>
+      c.query<{ id: string; lesson_id: string; step: SessionState['step']; started_at: Date; ended_at: Date | null }>(
+        'SELECT id, lesson_id, step, started_at, ended_at FROM sessions WHERE student_id = $1 ORDER BY started_at DESC LIMIT $2',
+        [studentId, limit],
+      ),
+    );
+    return result.rows.map((r) => ({
+      sessionId: r.id,
+      lessonId: r.lesson_id,
+      step: r.step,
+      startedAt: r.started_at.toISOString(),
+      endedAt: r.ended_at ? r.ended_at.toISOString() : null,
+    }));
   }
 }
 

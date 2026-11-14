@@ -65,6 +65,10 @@ export function readCookie(header: string | null, name: string): string | undefi
   return undefined;
 }
 
+export function clearStudentCookieHeader(secure: boolean): string {
+  return [`${STUDENT_COOKIE}=`, 'Path=/', 'HttpOnly', 'SameSite=Lax', 'Max-Age=0', ...(secure ? ['Secure'] : [])].join('; ');
+}
+
 export function studentCookieHeader(value: string, secure: boolean): string {
   return [
     `${STUDENT_COOKIE}=${value}`,

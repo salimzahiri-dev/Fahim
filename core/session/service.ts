@@ -68,6 +68,37 @@ async function serialized<T>(sessionId: string, work: () => Promise<T>): Promise
   }
 }
 
+export interface Progress {
+  sessions: Array<{ sessionId: string; lessonTitle: string; step: Step; startedAt: string; endedAt: string | null }>;
+  misconceptions: Array<{ code: string; label: string; seenCount: number; status: string }>;
+}
+
+/** What a student finds when they come back: their recent sessions and their misconception map. */
+export async function getProgress(actor: Actor, deps: SessionServiceDeps): Promise<Progress> {
+  const student = { orgId: actor.orgId, studentId: actor.studentId };
+  if (!canAccessStudent(actor, student)) throw new SessionNotFoundError();
+  const lessons = deps.engine.registries.lessons;
+  const sessions = await deps.store.listForStudent(scopeOf(actor), student.studentId, 20);
+  const map = await deps.engine.misconceptions.list(student.orgId, student.studentId);
+  const labelOf = (code: string) => {
+    for (const lesson of lessons.values()) {
+      const found = lesson.misconceptions.find((m) => m.code === code);
+      if (found) return found.label;
+    }
+    return code;
+  };
+  return {
+    sessions: sessions.map((s) => ({
+      sessionId: s.sessionId,
+      lessonTitle: lessons.get(s.lessonId)?.title ?? s.lessonId,
+      step: s.step,
+      startedAt: s.startedAt,
+      endedAt: s.endedAt,
+    })),
+    misconceptions: map.map((m) => ({ code: m.code, label: labelOf(m.code), seenCount: m.seenCount, status: m.status })),
+  };
+}
+
 /** The identity a store call runs for: always the verified actor, never a value from the request. */
 const scopeOf = (actor: Actor): StoreScope => ({ orgId: actor.orgId, userId: actor.studentId });
 

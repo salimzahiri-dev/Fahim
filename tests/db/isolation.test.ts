@@ -38,6 +38,9 @@ async function refused(sql: string, params: unknown[]): Promise<string> {
   throw new Error(`Expected refusal: ${sql}`);
 }
 
+/** Sign-in tables (decision 0003): reached only through the fahim_sign_in function. */
+const NO_DIRECT_ACCESS = ['invitations', 'sign_in_attempts'];
+
 interface TableCase {
   table: string;
   /** Column holding the organization. */
@@ -132,8 +135,14 @@ describe('the application database role', () => {
     const tables = await admin.query(
       "SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relkind = 'r' AND relname <> 'schema_migrations' ORDER BY relname",
     );
-    expect(tables.rows.map((r) => r.relname).sort()).toEqual(CASES.map((c) => c.table).sort());
+    expect(tables.rows.map((r) => r.relname).sort()).toEqual([...CASES.map((c) => c.table), ...NO_DIRECT_ACCESS].sort());
     for (const row of tables.rows) expect(row, row.relname).toMatchObject({ relrowsecurity: true, relforcerowsecurity: true });
+  });
+
+  it.each(NO_DIRECT_ACCESS)('cannot read or write %s directly, even with an identity', async (table) => {
+    for (const sql of [`SELECT * FROM ${table}`, `DELETE FROM ${table}`]) {
+      expect(await asA(() => refused(sql, []))).toBe('42501');
+    }
   });
 });
 

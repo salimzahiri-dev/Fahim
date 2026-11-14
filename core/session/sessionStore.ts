@@ -25,15 +25,36 @@ export interface SessionStore {
    * revision moved in between, then increments the revision.
    */
   save(scope: StoreScope, state: SessionState): Promise<void>;
+  /** The sessions of one student, most recent first. */
+  listForStudent(scope: StoreScope, studentId: string, limit: number): Promise<SessionSummary[]>;
+}
+
+export interface SessionSummary {
+  sessionId: string;
+  lessonId: string;
+  step: SessionState['step'];
+  /** ISO 8601. */
+  startedAt: string;
+  endedAt: string | null;
 }
 
 export class InMemorySessionStore implements SessionStore {
   private readonly sessions = new Map<string, SessionState>();
+  private readonly times = new Map<string, { startedAt: string; endedAt: string | null }>();
 
   async create(scope: StoreScope, state: SessionState): Promise<void> {
     if (state.orgId !== scope.orgId) throw new Error('Session belongs to another organization');
     if (this.sessions.has(state.sessionId)) throw new Error('Session already exists');
     this.sessions.set(state.sessionId, { ...structuredClone(state), revision: 0 });
+    this.times.set(state.sessionId, { startedAt: new Date().toISOString(), endedAt: null });
+  }
+
+  async listForStudent(scope: StoreScope, studentId: string, limit: number): Promise<SessionSummary[]> {
+    return [...this.sessions.values()]
+      .filter((s) => s.orgId === scope.orgId && s.studentId === studentId)
+      .map((s) => ({ sessionId: s.sessionId, lessonId: s.lessonId, step: s.step, ...this.times.get(s.sessionId)! }))
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+      .slice(0, limit);
   }
 
   async get(scope: StoreScope, sessionId: string): Promise<SessionState | null> {
@@ -48,5 +69,7 @@ export class InMemorySessionStore implements SessionStore {
     if (!existing || existing.orgId !== scope.orgId || state.orgId !== scope.orgId) throw new Error('Unknown session');
     if (existing.revision !== state.revision) throw new SessionConflictError();
     this.sessions.set(state.sessionId, { ...structuredClone(state), revision: state.revision + 1 });
+    const times = this.times.get(state.sessionId)!;
+    if (state.step === 'summary' && !times.endedAt) times.endedAt = new Date().toISOString();
   }
 }
