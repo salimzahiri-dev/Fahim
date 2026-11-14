@@ -31,6 +31,8 @@ export interface SessionState {
   reversedRoleReplies: number;
   /** Misconception codes recorded during this session, in order. The student's full map lives in MisconceptionStore. */
   sessionMisconceptions: string[];
+  /** Set by the session store: the number of saves, used to refuse a save from an outdated state. */
+  revision: number;
   transcript: Message[];
   usage: ModelUsage;
 }
@@ -76,6 +78,7 @@ export function newSession(input: { sessionId: string; orgId: string; studentId:
     exercise: null,
     reversedRoleReplies: 0,
     sessionMisconceptions: [],
+    revision: 0,
     transcript: [],
     usage: { inputTokens: 0, outputTokens: 0 },
   };

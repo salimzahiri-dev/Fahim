@@ -8,6 +8,8 @@ import { loadRegistries } from '../../modules';
 import { ClaudeAdapter } from '../../providers/model/claudeAdapter';
 import type { ModelProvider } from '../../providers/model/ModelProvider';
 import { OfflineProvider } from '../../providers/model/offlineProvider';
+import { createPool } from '../../providers/postgres/db';
+import { PostgresMisconceptionStore, PostgresSessionStore } from '../../providers/postgres/stores';
 import { createSessionHandlers, type SessionHandlers } from './handlers';
 import { PILOT_LESSON_ID, PILOT_ORG_ID } from './pilot';
 
@@ -41,6 +43,11 @@ function modelProvider(env: Env, production: boolean): ModelProvider {
 export function buildSessionHandlers(env: Env = process.env): SessionHandlers {
   const config = loadConfig(env);
   const production = config.env === 'production';
+  // With DATABASE_URL, sessions and the misconception map live in PostgreSQL; otherwise in memory.
+  const db = env.DATABASE_URL ? createPool(env.DATABASE_URL) : null;
+  // Decision 0002: anonymous students exist in development only, and only without a database
+  // (a student in the database comes from an invitation, decision 0003).
+  const anonymous = !production && !db;
 
   return createSessionHandlers({
     service: {
@@ -50,18 +57,17 @@ export function buildSessionHandlers(env: Env = process.env): SessionHandlers {
         maxTokens: config.maxTokens,
         systemPrompt: readFileSync(path.join(process.cwd(), 'prompts', 'tutor.system.md'), 'utf8'),
         registries: loadRegistries(),
-        misconceptions: new InMemoryMisconceptionStore(),
+        misconceptions: db ? new PostgresMisconceptionStore(db) : new InMemoryMisconceptionStore(),
         rng: Math.random,
         env: config.env,
       },
-      store: new InMemorySessionStore(),
+      store: db ? new PostgresSessionStore(db) : new InMemorySessionStore(),
       newSessionId: randomUUID,
     },
     cookieSecret: cookieSecret(env, production),
     secureCookies: production,
     lessonId: PILOT_LESSON_ID,
-    // Decision 0002: anonymous students exist in development only.
-    ...(production ? {} : { newStudent: () => ({ role: 'student' as const, orgId: PILOT_ORG_ID, studentId: randomUUID() }) }),
+    ...(!anonymous ? {} : { newStudent: () => ({ role: 'student' as const, orgId: PILOT_ORG_ID, studentId: randomUUID() }) }),
   });
 }
 

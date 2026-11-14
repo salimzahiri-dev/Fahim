@@ -13,6 +13,7 @@ import {
   startSession,
   type SessionServiceDeps,
 } from '../../core/session/service';
+import { SessionConflictError } from '../../core/session/sessionStore';
 import { InvalidEventError, LessonNotValidatedError } from '../../core/session/types';
 
 /**
@@ -33,13 +34,14 @@ export interface HandlerDeps {
   newStudent?: () => StudentIdentity;
 }
 
-type ErrorCode = 'unauthenticated' | 'invalid_event' | 'not_found' | 'lesson_not_validated' | 'server_error';
+type ErrorCode = 'unauthenticated' | 'invalid_event' | 'not_found' | 'conflict' | 'lesson_not_validated' | 'server_error';
 
 const STATUS: Record<ErrorCode, number> = {
   unauthenticated: 401,
   invalid_event: 400,
   not_found: 404,
   lesson_not_validated: 503,
+  conflict: 409,
   server_error: 500,
 };
 
@@ -51,6 +53,7 @@ function error(code: ErrorCode): Response {
 
 function mapError(err: unknown): Response {
   if (err instanceof SessionNotFoundError) return error('not_found');
+  if (err instanceof SessionConflictError) return error('conflict');
   if (err instanceof InvalidEventError) return error('invalid_event');
   if (err instanceof LessonNotValidatedError) return error('lesson_not_validated');
   // Details stay on the server and carry no student content.

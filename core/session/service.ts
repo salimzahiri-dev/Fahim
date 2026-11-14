@@ -1,6 +1,6 @@
 import { canAccessStudent, type Actor } from '../access/access';
 import { handleEvent, type EngineDeps } from './engine';
-import type { SessionStore } from './sessionStore';
+import type { SessionStore, StoreScope } from './sessionStore';
 import { InvalidEventError, newSession, type SessionEvent, type Step, type UiAction } from './types';
 
 /**
@@ -68,11 +68,14 @@ async function serialized<T>(sessionId: string, work: () => Promise<T>): Promise
   }
 }
 
+/** The identity a store call runs for: always the verified actor, never a value from the request. */
+const scopeOf = (actor: Actor): StoreScope => ({ orgId: actor.orgId, userId: actor.studentId });
+
 export async function startSession(actor: Actor, lessonId: string, deps: SessionServiceDeps): Promise<PublicTurn> {
   if (!deps.engine.registries.lessons.has(lessonId)) throw new InvalidEventError(`Unknown lesson ${lessonId}`);
   const state = newSession({ sessionId: deps.newSessionId(), orgId: actor.orgId, studentId: actor.studentId, lessonId });
   const turn = await handleEvent(state, { type: 'start' }, deps.engine);
-  await deps.store.create(actor.orgId, turn.state);
+  await deps.store.create(scopeOf(actor), turn.state);
   return { sessionId: turn.state.sessionId, step: turn.state.step, tutorText: turn.tutorText, ui: turn.ui };
 }
 
@@ -83,10 +86,10 @@ export async function sendSessionEvent(
   deps: SessionServiceDeps,
 ): Promise<PublicTurn> {
   return serialized(sessionId, async () => {
-    const state = await deps.store.get(actor.orgId, sessionId);
+    const state = await deps.store.get(scopeOf(actor), sessionId);
     if (!state || !canAccessStudent(actor, state)) throw new SessionNotFoundError();
     const turn = await handleEvent(state, event, deps.engine);
-    await deps.store.save(actor.orgId, turn.state);
+    await deps.store.save(scopeOf(actor), turn.state);
     return { sessionId, step: turn.state.step, tutorText: turn.tutorText, ui: turn.ui };
   });
 }

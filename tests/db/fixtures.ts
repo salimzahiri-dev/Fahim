@@ -58,6 +58,16 @@ export async function seedOrg(admin: pg.Client, name: string): Promise<OrgFixtur
   };
 }
 
+/** An organization with one student, enough for the session API. */
+export async function seedStudent(admin: pg.Client, orgId: string = randomUUID()): Promise<{ orgId: string; studentId: string }> {
+  const studentId = randomUUID();
+  await admin.query("INSERT INTO organizations (id, type, name) VALUES ($1, 'family', 'Famille test') ON CONFLICT (id) DO NOTHING", [orgId]);
+  await admin.query('INSERT INTO users (id, display_name) VALUES ($1, $2)', [studentId, 'Élève test']);
+  await admin.query("INSERT INTO memberships (org_id, user_id, role) VALUES ($1, $2, 'student')", [orgId, studentId]);
+  await admin.query('INSERT INTO student_profiles (org_id, user_id) VALUES ($1, $2)', [orgId, studentId]);
+  return { orgId, studentId };
+}
+
 /** Runs queries as the application role with a verified identity, like withIdentity does. */
 export async function asIdentity<T>(
   client: pg.Client,

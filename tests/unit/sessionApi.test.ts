@@ -109,7 +109,7 @@ describe('session API', () => {
     ]);
 
     const identity = verifyStudentCookie(cookie.split('=')[1], SECRET)!;
-    const saved = await store.get(identity.orgId, first.sessionId);
+    const saved = await store.get({ orgId: identity.orgId, userId: identity.studentId }, first.sessionId);
     expect(saved).toMatchObject({ step: 'summary', studentId: identity.studentId, orgId: 'pilot' });
   });
 
@@ -119,7 +119,7 @@ describe('session API', () => {
     const res = await handlers.start(post('/api/sessions', undefined, cookie));
     expect(res.headers.get('set-cookie')).toBeNull();
     const { sessionId } = await res.json();
-    expect((await store.get('pilot', sessionId))?.studentId).toBe('known');
+    expect((await store.get({ orgId: 'pilot', userId: 'test' }, sessionId))?.studentId).toBe('known');
   });
 
   it("refuses an event on another student's session and leaves it untouched", async () => {
@@ -134,7 +134,7 @@ describe('session API', () => {
     const intrusion = await handlers.event(post(`/api/sessions/${sessionA}/events`, { type: 'bet', choiceId: 'x4' }, cookieB), sessionA);
     expect(intrusion.status).toBe(404);
     expect(await intrusion.json()).toEqual({ error: 'not_found' });
-    expect((await store.get('pilot', sessionA))?.step).toBe('bet');
+    expect((await store.get({ orgId: 'pilot', userId: 'test' }, sessionA))?.step).toBe('bet');
 
     // The owner still can.
     const own = await handlers.event(post(`/api/sessions/${sessionA}/events`, { type: 'bet', choiceId: 'x4' }, cookieA), sessionA);
@@ -196,7 +196,7 @@ describe('session API', () => {
     const { sessionId } = await started.json();
     const res = await handlers.event(post(`/api/sessions/${sessionId}/events`, { type: 'law_choice', choiceId: 'b' }, cookie), sessionId);
     expect(res.status).toBe(400);
-    expect((await store.get('pilot', sessionId))?.step).toBe('bet');
+    expect((await store.get({ orgId: 'pilot', userId: 'test' }, sessionId))?.step).toBe('bet');
   });
 
   it('never sends the API key to the browser', async () => {
