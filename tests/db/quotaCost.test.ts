@@ -8,7 +8,7 @@ import { loadRegistries } from '../../modules';
 import { createPool, type Db } from '../../providers/postgres/db';
 import { PostgresMisconceptionStore, PostgresSessionStore } from '../../providers/postgres/stores';
 import { callTool, say, ScriptedProvider } from '../../providers/model/scriptedProvider';
-import type { ModelResponse } from '../../providers/model/ModelProvider';
+import type { ModelProvider, ModelResponse } from '../../providers/model/ModelProvider';
 import { APP_URL } from './env';
 import { adminClient, seedStudent } from './fixtures';
 
@@ -31,11 +31,14 @@ afterAll(async () => {
 /** Each scripted reply reports a different usage, so the total is not a coincidence. */
 const withUsage = (r: ModelResponse, input: number, output: number): ModelResponse => ({ ...r, usage: { inputTokens: input, outputTokens: output } });
 
-function handlers(steps: ModelResponse[], maxSessionsPerDay = 0) {
+function handlers(steps: ModelResponse[], maxSessionsPerDay = 0, delayMs = 0) {
+  const scripted = new ScriptedProvider(steps);
+  // A slow model widens the gap between the limit check and the insert, as a real model call does.
+  const model: ModelProvider = { respond: async (r) => (await new Promise((ok) => setTimeout(ok, delayMs)), scripted.respond(r)) };
   return createSessionHandlers({
     service: {
       engine: {
-        model: new ScriptedProvider(steps),
+        model,
         modelName: 'test-model',
         maxTokens: 500,
         systemPrompt: '',
@@ -102,6 +105,16 @@ describe('quotas and cost in PostgreSQL', () => {
     const second = await h.start(req('/api/sessions', cookie));
     expect(second.status).toBe(429);
     expect(await second.json()).toEqual({ error: 'daily_limit' });
+    const count = await admin.query('SELECT count(*)::int AS n FROM sessions WHERE student_id = $1', [student.studentId]);
+    expect(count.rows[0].n).toBe(1);
+  });
+
+  it('does not exceed the limit when two starts arrive at the same time', async () => {
+    const student = await seedStudent(admin);
+    const cookie = `fahim_student=${signStudentCookie({ role: 'student', ...student }, SECRET)}`;
+    const h = handlers([say('piège'), say('piège')], 1, 300);
+    const statuses = (await Promise.all([h.start(req('/api/sessions', cookie)), h.start(req('/api/sessions', cookie))])).map((r) => r.status);
+    expect(statuses.sort()).toEqual([201, 429]);
     const count = await admin.query('SELECT count(*)::int AS n FROM sessions WHERE student_id = $1', [student.studentId]);
     expect(count.rows[0].n).toBe(1);
   });

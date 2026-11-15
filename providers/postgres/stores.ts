@@ -1,8 +1,16 @@
 import { estimateCostUsd } from '../../core/billing/cost';
+import { assertWithinDailyLimit } from '../../core/billing/quota';
 import type { MisconceptionRecord, MisconceptionStore } from '../../core/memory/misconceptionStore';
-import { SessionConflictError, type SessionStore, type SessionSummary, type StoreScope } from '../../core/session/sessionStore';
+import {
+  SessionConflictError,
+  type SessionStore,
+  type SessionSummary,
+  type StartedSession,
+  type StartRequest,
+  type StoreScope,
+} from '../../core/session/sessionStore';
 import type { SessionState } from '../../core/session/types';
-import { withIdentity, type Db } from './db';
+import { withIdentity, type Db, type DbClient } from './db';
 
 /**
  * PostgreSQL implementations of the core stores. Every call runs in its own
@@ -25,32 +33,51 @@ export class PostgresSessionStore implements SessionStore {
     return estimateCostUsd(state.usage, this.prices);
   }
 
-  async create(scope: StoreScope, state: SessionState): Promise<void> {
-    if (state.orgId !== scope.orgId) throw new Error('Session belongs to another organization');
-    await withIdentity(this.db, scope, (c) =>
-      c.query(
-        `INSERT INTO sessions (id, org_id, student_id, lesson_id, step, state, revision, input_tokens, output_tokens, cost_usd)
-         VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9)`,
-        [
-          state.sessionId,
-          state.orgId,
-          state.studentId,
-          state.lessonId,
-          state.step,
-          { ...state, revision: 0 },
-          state.usage.inputTokens,
-          state.usage.outputTokens,
-          this.cost(state),
-        ],
-      ),
+  private async insert(c: DbClient, state: SessionState): Promise<void> {
+    await c.query(
+      `INSERT INTO sessions (id, org_id, student_id, lesson_id, step, state, revision, input_tokens, output_tokens, cost_usd)
+       VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9)`,
+      [
+        state.sessionId,
+        state.orgId,
+        state.studentId,
+        state.lessonId,
+        state.step,
+        { ...state, revision: 0 },
+        state.usage.inputTokens,
+        state.usage.outputTokens,
+        this.cost(state),
+      ],
     );
   }
 
-  async countStartedSince(scope: StoreScope, studentId: string, since: string): Promise<number> {
-    const result = await withIdentity(this.db, scope, (c) =>
-      c.query<{ n: number }>('SELECT count(*)::int AS n FROM sessions WHERE student_id = $1 AND started_at >= $2', [studentId, since]),
-    );
-    return result.rows[0]?.n ?? 0;
+  async create(scope: StoreScope, state: SessionState): Promise<void> {
+    if (state.orgId !== scope.orgId) throw new Error('Session belongs to another organization');
+    await withIdentity(this.db, scope, (c) => this.insert(c, state));
+  }
+
+  /**
+   * One transaction: a transaction-level advisory lock for this student, the count of
+   * today's sessions, the first turn, the insert. A concurrent start for the same
+   * student waits on the lock until this one commits, then counts the new row.
+   * The transaction stays open during the first model call; with the pool of 10
+   * connections this is fine for the pilot (five students).
+   */
+  async start<T>(scope: StoreScope, request: StartRequest, produce: () => Promise<StartedSession<T>>): Promise<T> {
+    return withIdentity(this.db, scope, async (c) => {
+      await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`fahim:session-start:${scope.orgId}:${request.studentId}`]);
+      if (request.limit > 0) {
+        const counted = await c.query<{ n: number }>(
+          'SELECT count(*)::int AS n FROM sessions WHERE student_id = $1 AND started_at >= $2',
+          [request.studentId, request.since],
+        );
+        assertWithinDailyLimit(counted.rows[0]?.n ?? 0, request.limit);
+      }
+      const { state, reply } = await produce();
+      if (state.orgId !== scope.orgId || state.studentId !== request.studentId) throw new Error('Session belongs to another student');
+      await this.insert(c, state);
+      return reply;
+    });
   }
 
   async get(scope: StoreScope, sessionId: string): Promise<SessionState | null> {

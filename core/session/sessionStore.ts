@@ -1,3 +1,4 @@
+import { assertWithinDailyLimit } from '../billing/quota';
 import type { SessionState } from './types';
 
 /**
@@ -16,7 +17,29 @@ export interface StoreScope {
 /** The session changed since it was read: another request saved it first. */
 export class SessionConflictError extends Error {}
 
+/** What a start needs to know about the daily limit (C4). */
+export interface StartRequest {
+  studentId: string;
+  /** Start of the current quota day, ISO 8601. */
+  since: string;
+  /** Sessions allowed per day; 0 or less means no limit. */
+  limit: number;
+}
+
+/** The first turn of a new session: its state to store and the reply for the browser. */
+export interface StartedSession<T> {
+  state: SessionState;
+  reply: T;
+}
+
 export interface SessionStore {
+  /**
+   * Starts a session atomically: under a lock held for this student, counts the
+   * sessions started since `request.since`, throws DailyLimitError at the limit,
+   * otherwise runs `produce` (the first turn) and stores its state. A second start
+   * for the same student waits for the first one, so the limit holds under concurrency.
+   */
+  start<T>(scope: StoreScope, request: StartRequest, produce: () => Promise<StartedSession<T>>): Promise<T>;
   create(scope: StoreScope, state: SessionState): Promise<void>;
   /** Returns the state with its current revision, or null if it does not exist for this organization. */
   get(scope: StoreScope, sessionId: string): Promise<SessionState | null>;
@@ -27,8 +50,6 @@ export interface SessionStore {
   save(scope: StoreScope, state: SessionState): Promise<void>;
   /** The sessions of one student, most recent first. */
   listForStudent(scope: StoreScope, studentId: string, limit: number): Promise<SessionSummary[]>;
-  /** Sessions the student started at or after `since` (ISO 8601), for the daily limit. */
-  countStartedSince(scope: StoreScope, studentId: string, since: string): Promise<number>;
 }
 
 export interface SessionSummary {
@@ -44,12 +65,29 @@ export class InMemorySessionStore implements SessionStore {
   private readonly sessions = new Map<string, SessionState>();
   private readonly times = new Map<string, { startedAt: string; endedAt: string | null }>();
 
+  /** One chain of pending starts per student: the in-memory equivalent of the database lock. */
+  private readonly startLocks = new Map<string, Promise<unknown>>();
+
   constructor(private readonly now: () => Date = () => new Date()) {}
 
-  async countStartedSince(scope: StoreScope, studentId: string, since: string): Promise<number> {
-    return [...this.sessions.values()].filter(
-      (s) => s.orgId === scope.orgId && s.studentId === studentId && this.times.get(s.sessionId)!.startedAt >= since,
-    ).length;
+  async start<T>(scope: StoreScope, request: StartRequest, produce: () => Promise<StartedSession<T>>): Promise<T> {
+    const lockKey = `${scope.orgId}:${request.studentId}`;
+    const previous = this.startLocks.get(lockKey) ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(async () => {
+      const startedToday = [...this.sessions.values()].filter(
+        (s) => s.orgId === scope.orgId && s.studentId === request.studentId && this.times.get(s.sessionId)!.startedAt >= request.since,
+      ).length;
+      assertWithinDailyLimit(startedToday, request.limit);
+      const { state, reply } = await produce();
+      await this.create(scope, state);
+      return reply;
+    });
+    this.startLocks.set(lockKey, current);
+    try {
+      return await current;
+    } finally {
+      if (this.startLocks.get(lockKey) === current) this.startLocks.delete(lockKey);
+    }
   }
 
   async create(scope: StoreScope, state: SessionState): Promise<void> {

@@ -1,5 +1,5 @@
 import { canAccessStudent, type StudentIdentity } from '../access/access';
-import { assertWithinDailyLimit, startOfLocalDay } from '../billing/quota';
+import { startOfLocalDay } from '../billing/quota';
 import { handleEvent, type EngineDeps } from './engine';
 import type { SessionStore, StoreScope } from './sessionStore';
 import { InvalidEventError, newSession, type SessionEvent, type Step, type UiAction } from './types';
@@ -109,16 +109,22 @@ const scopeOf = (actor: StudentIdentity): StoreScope => ({ orgId: actor.orgId, u
 
 export async function startSession(actor: StudentIdentity, lessonId: string, deps: SessionServiceDeps): Promise<PublicTurn> {
   if (!deps.engine.registries.lessons.has(lessonId)) throw new InvalidEventError(`Unknown lesson ${lessonId}`);
-  if (deps.maxSessionsPerDay && deps.maxSessionsPerDay > 0) {
-    // Checked before the first model call, so a refused session costs nothing.
-    const since = startOfLocalDay((deps.now ?? (() => new Date()))()).toISOString();
-    const started = await deps.store.countStartedSince(scopeOf(actor), actor.studentId, since);
-    assertWithinDailyLimit(started, deps.maxSessionsPerDay);
-  }
-  const state = newSession({ sessionId: deps.newSessionId(), orgId: actor.orgId, studentId: actor.studentId, lessonId });
-  const turn = await handleEvent(state, { type: 'start' }, deps.engine);
-  await deps.store.create(scopeOf(actor), turn.state);
-  return { sessionId: turn.state.sessionId, step: turn.state.step, tutorText: turn.tutorText, ui: turn.ui };
+  const request = {
+    studentId: actor.studentId,
+    since: startOfLocalDay((deps.now ?? (() => new Date()))()).toISOString(),
+    limit: deps.maxSessionsPerDay ?? 0,
+  };
+  // The store checks the limit and creates the session under one lock per student, so two
+  // simultaneous starts cannot both pass the check. The check comes before the first model
+  // call, so a refused session costs nothing.
+  return deps.store.start<PublicTurn>(scopeOf(actor), request, async () => {
+    const state = newSession({ sessionId: deps.newSessionId(), orgId: actor.orgId, studentId: actor.studentId, lessonId });
+    const turn = await handleEvent(state, { type: 'start' }, deps.engine);
+    return {
+      state: turn.state,
+      reply: { sessionId: turn.state.sessionId, step: turn.state.step, tutorText: turn.tutorText, ui: turn.ui },
+    };
+  });
 }
 
 export async function sendSessionEvent(
