@@ -37,3 +37,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): FahimConfig {
     env: deploymentEnv(env),
   };
 }
+
+/**
+ * Lines to log when the server starts. A development environment relaxes the
+ * production guarantees, so it must never pass unnoticed (owner decision on
+ * decision 0005, 2026-11-15).
+ */
+export function startupWarnings(config: FahimConfig): string[] {
+  if (config.env !== 'development') return [];
+  return [
+    'WARNING: Fahim is running in DEVELOPMENT mode (FAHIM_ENV or NODE_ENV). ' +
+      'Unvalidated lessons, the offline model and, without a database, anonymous students are allowed. ' +
+      'Never expose this server to students; set FAHIM_ENV=production for a real deployment.',
+  ];
+}

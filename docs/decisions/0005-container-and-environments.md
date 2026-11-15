@@ -17,3 +17,7 @@ Backlog D1 asks that a fresh clone starts with one command and that a session ca
 - One command: `docker compose up --build`; the access code is in the `init` output.
 - A real deployment (D2) must set `FAHIM_ENV=production` (or leave it unset), real database passwords, `FAHIM_COOKIE_SECRET` and `ANTHROPIC_API_KEY`, and must not use the local defaults. In production the `init` service creates no local student.
 - The cookie is not `Secure` in development, which the local `http://localhost` needs.
+
+## Amendment (2026-11-15)
+
+Accepted by the owner. The server logs a clear warning at startup whenever the environment is `development` (`instrumentation.ts`, `startupWarnings` in `core/config.ts`).
