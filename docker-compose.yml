@@ -3,7 +3,7 @@
 #
 # Defaults are for a local machine only: development mode, offline model (no API spending),
 # local database passwords. A real deployment sets FAHIM_ENV=production, real passwords,
-# FAHIM_COOKIE_SECRET and ANTHROPIC_API_KEY (backlog D2).
+# FAHIM_COOKIE_SECRET and ANTHROPIC_API_KEY: use docker-compose.prod.yml and docs/DEPLOY.md instead.
 services:
   db:
     image: postgres:17-alpine

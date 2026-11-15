@@ -14,7 +14,7 @@ Requires Docker.
 docker compose up --build
 ```
 
-Open http://localhost:3100 and sign in with the code printed by the `init` service. This local stack runs in development mode with the offline model (no API key, no cost) and local-only database passwords. See `docs/decisions/0005-container-and-environments.md` before any real deployment.
+Open http://localhost:3100 and sign in with the code printed by the `init` service. For a real server, see `docs/DEPLOY.md`. This local stack runs in development mode with the offline model (no API key, no cost) and local-only database passwords. See `docs/decisions/0005-container-and-environments.md` before any real deployment.
 
 ### For development
 
@@ -81,4 +81,4 @@ With `DATABASE_URL` set, the web app stores sessions and the misconception map i
 ## Status
 
 - **The lesson has not been validated by a teacher** (`validated: false`, backlog A2).
-- Deployment, backups and the owner's review page are the next steps (`docs/BACKLOG.md`).
+- Deployment is prepared but not done: `docker-compose.prod.yml` (Caddy for HTTPS, nightly encrypted backups to S3-compatible storage, restore script) and the steps and secrets in `docs/DEPLOY.md`. The host and the backup provider are the owner's choice (backlog D2).

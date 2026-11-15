@@ -1,0 +1,112 @@
+# Production deployment (backlog D2). Steps and secrets: docs/DEPLOY.md.
+#
+#   docker compose -f docker-compose.prod.yml --env-file /etc/fahim/fahim.env up -d --build
+#
+# Every secret comes from the env file; a missing one stops the command (":?").
+# Networks: "backend" has no internet access (database, migrations); only Caddy
+# publishes ports; the app is reachable only through Caddy; the backup service
+# reaches the database and the S3 endpoint, nothing else listens.
+name: fahim
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fahim
+      POSTGRES_PASSWORD: ${FAHIM_DB_PASSWORD:?set FAHIM_DB_PASSWORD in the env file}
+    volumes:
+      - fahim-db:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fahim"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Applies migrations and policies, sets the application role's password, then exits.
+  # Also the container for operator commands (npm run invite), see docs/DEPLOY.md.
+  init:
+    build:
+      context: .
+      target: tools
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_ADMIN_URL: postgres://postgres:${FAHIM_DB_PASSWORD}@db:5432/fahim
+      FAHIM_APP_DB_PASSWORD: ${FAHIM_APP_DB_PASSWORD:?set FAHIM_APP_DB_PASSWORD in the env file}
+      FAHIM_ENV: production
+    networks: [backend]
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: app
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://fahim_app:${FAHIM_APP_DB_PASSWORD}@db:5432/fahim
+      FAHIM_ENV: production
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in the env file}
+      FAHIM_COOKIE_SECRET: ${FAHIM_COOKIE_SECRET:?set FAHIM_COOKIE_SECRET in the env file}
+      FAHIM_PROXY_SECRET: ${FAHIM_PROXY_SECRET:?set FAHIM_PROXY_SECRET in the env file}
+      FAHIM_MAX_SESSIONS_PER_DAY: ${FAHIM_MAX_SESSIONS_PER_DAY:-3}
+      FAHIM_MODEL: ${FAHIM_MODEL:-}
+    # No published port: only Caddy, on the "edge" network, reaches it.
+    networks: [backend, edge]
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "${FAHIM_HTTP_PORT:-80}:80"
+      - "${FAHIM_HTTPS_PORT:-443}:443"
+      - "${FAHIM_HTTPS_PORT:-443}:443/udp"
+    environment:
+      FAHIM_DOMAIN: ${FAHIM_DOMAIN:?set FAHIM_DOMAIN in the env file}
+      FAHIM_PROXY_SECRET: ${FAHIM_PROXY_SECRET}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [edge]
+
+  # Nightly encrypted pg_dump to S3-compatible storage, plus 7 local copies (deploy/backup).
+  backup:
+    build: deploy/backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: postgres
+      PGPASSWORD: ${FAHIM_DB_PASSWORD}
+      PGDATABASE: fahim
+      TZ: Africa/Casablanca
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?set BACKUP_AGE_RECIPIENT (age public key) in the env file}
+      S3_ENDPOINT: ${S3_ENDPOINT:?set S3_ENDPOINT in the env file}
+      S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET in the env file}
+      S3_REGION: ${S3_REGION:-auto}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID in the env file}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY in the env file}
+    volumes:
+      - fahim-backups:/backups
+    networks: [backend, egress]
+
+networks:
+  backend:
+    internal: true
+  edge: {}
+  egress: {}
+
+volumes:
+  fahim-db:
+  fahim-backups:
+  caddy-data:
+  caddy-config:

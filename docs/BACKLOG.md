@@ -42,6 +42,7 @@ The order follows `VISION.md`: teaching loop first, then accounts and memory, th
 - [x] D1. Dockerfile for the application and a compose file with PostgreSQL.
   Done when: a fresh clone starts with one command and a session can be played.
 - [ ] D2. **(ask first)** Choose the host, deploy, set up a daily database backup copied to a second place.
+  Prepared without any account (2026-11-15): `docker-compose.prod.yml`, `deploy/`, `docs/DEPLOY.md`. Left: the owner chooses the host and the backup provider, provides the secrets listed in `docs/DEPLOY.md`, then deploys.
   Done when: the pilot address works from a phone on mobile data and a restore from backup has been tried once.
 - [x] D3. Owner-only page: list of sessions with step reached, cost and transcript, for the daily review during the pilot.
   Done when: the page is reachable only by the owner account and every view is written to `access_log`.

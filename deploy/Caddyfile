@@ -1,0 +1,25 @@
+# Reverse proxy and HTTPS for Fahim (backlog D2, docker-compose.prod.yml).
+# Caddy obtains and renews the certificate for FAHIM_DOMAIN by itself (port 80 must be reachable).
+{
+	# Nothing reconfigures Caddy at runtime.
+	admin off
+}
+
+{$FAHIM_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	reverse_proxy app:3000 {
+		# The client address as Caddy sees it, replacing any X-Forwarded-For the client sent.
+		header_up X-Forwarded-For {remote_host}
+		# Proves to the app that the request came through this proxy (FAHIM_PROXY_SECRET):
+		# the app believes X-Forwarded-For only when this header matches. Replaces any value the client sent.
+		header_up X-Fahim-Proxy-Secret {$FAHIM_PROXY_SECRET}
+	}
+}
