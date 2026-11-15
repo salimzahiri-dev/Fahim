@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { splitTutorText, visibleStepIndex } from '../../app/session/display';
+import { parseStartBody } from '../../core/session/service';
+import { newStartKey, splitTutorText, visibleStepIndex } from '../../app/session/display';
 import { InMemoryMisconceptionStore } from '../../core/memory/misconceptionStore';
 import { handleEvent, type EngineDeps } from '../../core/session/engine';
 import { newSession } from '../../core/session/types';
@@ -61,5 +62,14 @@ describe('offline provider', () => {
     const end = await handleEvent(s, { type: 'message', text: 'Car Ec ×4' }, deps);
     expect(end.state.step).toBe('summary');
     expect(end.ui[0]?.type).toBe('show_summary');
+  });
+});
+
+describe('start key', () => {
+  it('is a version 4 UUID that the server accepts, built without crypto.randomUUID', () => {
+    const key = newStartKey((b) => b.fill(0xab));
+    expect(key).toBe('abababab-abab-4bab-abab-abababababab');
+    expect(parseStartBody({ startKey: newStartKey() })).toEqual({ startKey: expect.any(String) });
+    expect(newStartKey()).not.toBe(newStartKey());
   });
 });

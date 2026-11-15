@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import type { PublicTurn } from '../../core/session/service';
 import type { UiAction } from '../../core/session/types';
-import { errorMessage, splitTutorText, visibleStepIndex, VISIBLE_STEPS } from './display';
+import { errorMessage, newStartKey, splitTutorText, visibleStepIndex, VISIBLE_STEPS } from './display';
 import { ExperimentArea } from './ExperimentArea';
 import { ExercisePanel } from './ExercisePanel';
 import { SummaryPanel } from './SummaryPanel';
@@ -49,6 +49,9 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // One key per press of "Commencer": a repeated or retried start returns the same session.
+  const startKey = useRef<string | null>(null);
+  const starting = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const choicesRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLElement>(null);
@@ -102,14 +105,20 @@ export function SessionScreen({ lessonTitle }: { lessonTitle: string }) {
   );
 
   const start = useCallback(async () => {
+    if (starting.current) return;
+    starting.current = true;
+    startKey.current ??= newStartKey();
     setPending(true);
     setEntries([]);
     setChoices(null);
     setFatal(false);
     setStep('trap');
     setNotice(null);
-    const result = await call('/api/sessions');
+    const result = await call('/api/sessions', { startKey: startKey.current });
+    starting.current = false;
     setPending(false);
+    // Kept after a network failure, so pressing again retries the same start.
+    if (result.ok || result.code) startKey.current = null;
     if (result.ok) applyTurn(result.turn);
     else if (result.code === 'unauthenticated') fail(result.code);
     // A session that could not start stays on the first screen, with the reason.

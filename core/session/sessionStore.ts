@@ -24,6 +24,11 @@ export interface StartRequest {
   since: string;
   /** Sessions allowed per day; 0 or less means no limit. */
   limit: number;
+  /**
+   * Random key the page sends with one press of "Commencer". A start with a key
+   * already used by this student returns the reply of the session it created.
+   */
+  startKey?: string;
 }
 
 /** The first turn of a new session: its state to store and the reply for the browser. */
@@ -38,6 +43,8 @@ export interface SessionStore {
    * sessions started since `request.since`, throws DailyLimitError at the limit,
    * otherwise runs `produce` (the first turn) and stores its state. A second start
    * for the same student waits for the first one, so the limit holds under concurrency.
+   * If `request.startKey` was already used by this student, returns the stored reply
+   * of that session without counting, calling `produce` or creating anything.
    */
   start<T>(scope: StoreScope, request: StartRequest, produce: () => Promise<StartedSession<T>>): Promise<T>;
   create(scope: StoreScope, state: SessionState): Promise<void>;
@@ -67,19 +74,23 @@ export class InMemorySessionStore implements SessionStore {
 
   /** One chain of pending starts per student: the in-memory equivalent of the database lock. */
   private readonly startLocks = new Map<string, Promise<unknown>>();
+  private readonly startReplies = new Map<string, unknown>();
 
   constructor(private readonly now: () => Date = () => new Date()) {}
 
   async start<T>(scope: StoreScope, request: StartRequest, produce: () => Promise<StartedSession<T>>): Promise<T> {
     const lockKey = `${scope.orgId}:${request.studentId}`;
     const previous = this.startLocks.get(lockKey) ?? Promise.resolve();
+    const replyKey = request.startKey ? `${lockKey}:${request.startKey}` : null;
     const current = previous.catch(() => undefined).then(async () => {
+      if (replyKey && this.startReplies.has(replyKey)) return structuredClone(this.startReplies.get(replyKey)) as T;
       const startedToday = [...this.sessions.values()].filter(
         (s) => s.orgId === scope.orgId && s.studentId === request.studentId && this.times.get(s.sessionId)!.startedAt >= request.since,
       ).length;
       assertWithinDailyLimit(startedToday, request.limit);
       const { state, reply } = await produce();
       await this.create(scope, state);
+      if (replyKey) this.startReplies.set(replyKey, structuredClone(reply));
       return reply;
     });
     this.startLocks.set(lockKey, current);

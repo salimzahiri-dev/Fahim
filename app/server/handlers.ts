@@ -13,6 +13,7 @@ import {
 import {
   getProgress,
   parseClientEvent,
+  parseStartBody,
   sendSessionEvent,
   SessionNotFoundError,
   startSession,
@@ -94,7 +95,10 @@ export function createSessionHandlers(deps: HandlerDeps) {
     verifyStudentCookie(readCookie(request.headers.get('cookie'), STUDENT_COOKIE), deps.cookieSecret);
 
   return {
-    /** POST /api/sessions: starts a session of the pilot lesson for the cookie's student. */
+    /**
+     * POST /api/sessions [{ startKey }]: starts a session of the pilot lesson for the cookie's student.
+     * The same startKey twice returns the same session (double tap, retried request).
+     */
     async start(request: Request): Promise<Response> {
       let actor = identify(request);
       const headers = new Headers(NO_STORE);
@@ -103,8 +107,10 @@ export function createSessionHandlers(deps: HandlerDeps) {
         actor = deps.newStudent();
         headers.append('set-cookie', studentCookieHeader(signStudentCookie(actor, deps.cookieSecret), deps.secureCookies));
       }
+      const body = parseStartBody(await readJson(request));
+      if (!body) return error('invalid_event');
       try {
-        const turn = await startSession(actor, deps.lessonId, deps.service);
+        const turn = await startSession(actor, deps.lessonId, deps.service, body.startKey);
         return Response.json(turn, { status: 201, headers });
       } catch (err) {
         return mapError(err);

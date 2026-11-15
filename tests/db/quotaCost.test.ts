@@ -118,4 +118,23 @@ describe('quotas and cost in PostgreSQL', () => {
     const count = await admin.query('SELECT count(*)::int AS n FROM sessions WHERE student_id = $1', [student.studentId]);
     expect(count.rows[0].n).toBe(1);
   });
+
+  it('creates one session when the same start arrives twice at the same time, and replays it on a retry', async () => {
+    const student = await seedStudent(admin);
+    const cookie = `fahim_student=${signStudentCookie({ role: 'student', ...student }, SECRET)}`;
+    const h = handlers([say('piège'), say('autre piège'), say('encore')], 3, 300);
+    const body = { startKey: randomUUID() };
+    const [a, b] = await Promise.all([h.start(req('/api/sessions', cookie, body)), h.start(req('/api/sessions', cookie, body))]);
+    expect([a.status, b.status]).toEqual([201, 201]);
+    const first = await a.json();
+    expect(await b.json()).toEqual(first);
+    // The browser retries after a lost response: same session again, no new model call.
+    expect(await (await h.start(req('/api/sessions', cookie, body))).json()).toEqual(first);
+    const count = await admin.query('SELECT count(*)::int AS n FROM sessions WHERE student_id = $1', [student.studentId]);
+    expect(count.rows[0].n).toBe(1);
+    // A new start (a new key) is a new session.
+    const next = await h.start(req('/api/sessions', cookie, { startKey: randomUUID() }));
+    expect(next.status).toBe(201);
+    expect((await next.json()).sessionId).not.toBe(first.sessionId);
+  });
 });

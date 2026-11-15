@@ -75,3 +75,15 @@ export function errorMessage(code: string | undefined): string {
       return 'Problème de connexion. Réessaie dans un instant.';
   }
 }
+
+/**
+ * A random UUID (version 4) for the start key. crypto.randomUUID exists only in
+ * secure contexts; getRandomValues also works on plain http (a phone on the local network).
+ */
+export function newStartKey(random: (bytes: Uint8Array) => Uint8Array = (b) => crypto.getRandomValues(b)): string {
+  const b = random(new Uint8Array(16));
+  b[6] = (b[6]! & 0x0f) | 0x40;
+  b[8] = (b[8]! & 0x3f) | 0x80;
+  const hex = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}

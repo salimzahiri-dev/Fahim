@@ -33,10 +33,10 @@ export class PostgresSessionStore implements SessionStore {
     return estimateCostUsd(state.usage, this.prices);
   }
 
-  private async insert(c: DbClient, state: SessionState): Promise<void> {
+  private async insert(c: DbClient, state: SessionState, start?: { key: string; reply: unknown }): Promise<void> {
     await c.query(
-      `INSERT INTO sessions (id, org_id, student_id, lesson_id, step, state, revision, input_tokens, output_tokens, cost_usd)
-       VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9)`,
+      `INSERT INTO sessions (id, org_id, student_id, lesson_id, step, state, revision, input_tokens, output_tokens, cost_usd, start_key, start_reply)
+       VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9, $10, $11)`,
       [
         state.sessionId,
         state.orgId,
@@ -47,6 +47,8 @@ export class PostgresSessionStore implements SessionStore {
         state.usage.inputTokens,
         state.usage.outputTokens,
         this.cost(state),
+        start?.key ?? null,
+        start ? JSON.stringify(start.reply) : null,
       ],
     );
   }
@@ -66,6 +68,13 @@ export class PostgresSessionStore implements SessionStore {
   async start<T>(scope: StoreScope, request: StartRequest, produce: () => Promise<StartedSession<T>>): Promise<T> {
     return withIdentity(this.db, scope, async (c) => {
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`fahim:session-start:${scope.orgId}:${request.studentId}`]);
+      if (request.startKey) {
+        const replay = await c.query<{ start_reply: T }>('SELECT start_reply FROM sessions WHERE student_id = $1 AND start_key = $2', [
+          request.studentId,
+          request.startKey,
+        ]);
+        if (replay.rows[0]) return replay.rows[0].start_reply;
+      }
       if (request.limit > 0) {
         const counted = await c.query<{ n: number }>(
           'SELECT count(*)::int AS n FROM sessions WHERE student_id = $1 AND started_at >= $2',
@@ -75,7 +84,7 @@ export class PostgresSessionStore implements SessionStore {
       }
       const { state, reply } = await produce();
       if (state.orgId !== scope.orgId || state.studentId !== request.studentId) throw new Error('Session belongs to another student');
-      await this.insert(c, state);
+      await this.insert(c, state, request.startKey ? { key: request.startKey, reply } : undefined);
       return reply;
     });
   }

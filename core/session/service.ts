@@ -107,12 +107,34 @@ export async function getProgress(actor: StudentIdentity, deps: SessionServiceDe
 /** The identity a store call runs for: always the verified actor, never a value from the request. */
 const scopeOf = (actor: StudentIdentity): StoreScope => ({ orgId: actor.orgId, userId: actor.studentId });
 
-export async function startSession(actor: StudentIdentity, lessonId: string, deps: SessionServiceDeps): Promise<PublicTurn> {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Strict reading of a start body: nothing, an empty object, or { startKey: <uuid> }.
+ * Returns undefined for "no key", null for a body to refuse.
+ */
+export function parseStartBody(body: unknown): { startKey?: string } | null {
+  if (body === undefined) return {};
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
+  const keys = Object.keys(body);
+  if (keys.length === 0) return {};
+  const startKey = (body as Record<string, unknown>).startKey;
+  if (keys.length !== 1 || typeof startKey !== 'string' || !UUID.test(startKey)) return null;
+  return { startKey: startKey.toLowerCase() };
+}
+
+export async function startSession(
+  actor: StudentIdentity,
+  lessonId: string,
+  deps: SessionServiceDeps,
+  startKey?: string,
+): Promise<PublicTurn> {
   if (!deps.engine.registries.lessons.has(lessonId)) throw new InvalidEventError(`Unknown lesson ${lessonId}`);
   const request = {
     studentId: actor.studentId,
     since: startOfLocalDay((deps.now ?? (() => new Date()))()).toISOString(),
     limit: deps.maxSessionsPerDay ?? 0,
+    ...(startKey ? { startKey } : {}),
   };
   // The store checks the limit and creates the session under one lock per student, so two
   // simultaneous starts cannot both pass the check. The check comes before the first model
