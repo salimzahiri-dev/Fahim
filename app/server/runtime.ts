@@ -79,7 +79,7 @@ export function buildServer(env: Env = process.env): Server {
     cookieSecret: secret,
     secureCookies: production,
     lessonId: PILOT_LESSON_ID,
-    ...(db ? { invitations: new PostgresInvitationDirectory(db) } : {}),
+    ...(db ? { invitations: new PostgresInvitationDirectory(db), accounts: new PostgresAccountDirectory(db) } : {}),
     ...(!anonymous ? {} : { newStudent: () => ({ role: 'student' as const, orgId: PILOT_ORG_ID, studentId: randomUUID() }) }),
   });
 

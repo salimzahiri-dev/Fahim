@@ -19,6 +19,7 @@ import {
   startSession,
   type SessionServiceDeps,
 } from '../../core/session/service';
+import { resolveActor, type AccountDirectory } from '../../core/review/service';
 import { SessionConflictError } from '../../core/session/sessionStore';
 import { InvalidEventError, LessonNotValidatedError } from '../../core/session/types';
 
@@ -40,6 +41,11 @@ export interface HandlerDeps {
   newStudent?: () => StudentIdentity;
   /** Invitation codes (decision 0003). Without it, sign-in is not offered. */
   invitations?: InvitationDirectory;
+  /**
+   * Roles from the database (decision 0006). With it, an owner account that tries to
+   * start a session gets a clear refusal instead of a failed insert.
+   */
+  accounts?: AccountDirectory;
 }
 
 type ErrorCode =
@@ -50,6 +56,7 @@ type ErrorCode =
   | 'not_found'
   | 'conflict'
   | 'daily_limit'
+  | 'not_a_student'
   | 'lesson_not_validated'
   | 'server_error';
 
@@ -62,6 +69,7 @@ const STATUS: Record<ErrorCode, number> = {
   lesson_not_validated: 503,
   conflict: 409,
   daily_limit: 429,
+  not_a_student: 403,
   server_error: 500,
 };
 
@@ -110,6 +118,8 @@ export function createSessionHandlers(deps: HandlerDeps) {
       const body = parseStartBody(await readJson(request));
       if (!body) return error('invalid_event');
       try {
+        // Decision 0006: the owner's account reviews sessions; it has no student profile to play one.
+        if (deps.accounts && (await resolveActor(actor, deps.accounts)).role === 'platform_admin') return error('not_a_student');
         const turn = await startSession(actor, deps.lessonId, deps.service, body.startKey);
         return Response.json(turn, { status: 201, headers });
       } catch (err) {

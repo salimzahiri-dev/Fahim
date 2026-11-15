@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createSessionHandlers } from '../../app/server/handlers';
 import { createReviewHandlers } from '../../app/server/review';
+import { InMemoryMisconceptionStore } from '../../core/memory/misconceptionStore';
+import { loadRegistries } from '../../modules';
+import { say, ScriptedProvider } from '../../providers/model/scriptedProvider';
+import { PostgresSessionStore } from '../../providers/postgres/stores';
 import { signStudentCookie } from '../../core/access/studentCookie';
 import { createPool, type Db } from '../../providers/postgres/db';
 import { createInvitedOwner, createInvitedStudent, findOrCreateOrganization } from '../../providers/postgres/invitations';
@@ -107,5 +112,38 @@ describe('owner review', () => {
     // A signed cookie naming A's owner in B's organization: no platform_admin membership there.
     expect(await review.list(cookieOf(b.orgId, a.ownerId))).toBeNull();
     expect(await logCount(b.orgId)).toBe(0);
+  });
+
+  it('tells the owner clearly that their account cannot start a session, and creates nothing', async () => {
+    const a = await org('A');
+    const model = new ScriptedProvider([say('piège')]);
+    const sessions = createSessionHandlers({
+      service: {
+        engine: {
+          model,
+          modelName: 'm',
+          maxTokens: 1,
+          systemPrompt: '',
+          registries: loadRegistries(),
+          misconceptions: new InMemoryMisconceptionStore(),
+          rng: () => 0.5,
+          env: 'development',
+        },
+        store: new PostgresSessionStore(pool),
+        newSessionId: randomUUID,
+      },
+      accounts: new PostgresAccountDirectory(pool),
+      cookieSecret: SECRET,
+      secureCookies: false,
+      lessonId: 'work-kinetic-energy',
+    });
+    const res = await sessions.start(
+      new Request('http://localhost/api/sessions', { method: 'POST', headers: { cookie: `fahim_student=${cookieOf(a.orgId, a.ownerId)}` } }),
+    );
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'not_a_student' });
+    expect(model.requests).toHaveLength(0);
+    const count = await admin.query('SELECT count(*)::int AS n FROM sessions WHERE student_id = $1', [a.ownerId]);
+    expect(count.rows[0].n).toBe(0);
   });
 });

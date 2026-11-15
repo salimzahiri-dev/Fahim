@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseStartBody } from '../../core/session/service';
-import { newStartKey, splitTutorText, visibleStepIndex } from '../../app/session/display';
+import { errorMessage, newStartKey, splitTutorText, visibleStepIndex } from '../../app/session/display';
 import { InMemoryMisconceptionStore } from '../../core/memory/misconceptionStore';
 import { handleEvent, type EngineDeps } from '../../core/session/engine';
 import { newSession } from '../../core/session/types';
@@ -71,5 +71,12 @@ describe('start key', () => {
     expect(key).toBe('abababab-abab-4bab-abab-abababababab');
     expect(parseStartBody({ startKey: newStartKey() })).toEqual({ startKey: expect.any(String) });
     expect(newStartKey()).not.toBe(newStartKey());
+  });
+});
+
+describe('owner start message', () => {
+  it('explains in French that the owner account is for the review page', () => {
+    expect(errorMessage('not_a_student')).toMatch(/\/revue/);
+    expect(errorMessage('not_a_student')).toMatch(/code élève/);
   });
 });

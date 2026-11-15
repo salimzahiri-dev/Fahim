@@ -47,7 +47,7 @@ npm run invite -- --org "Pilote Fahim" --owner "Propriétaire"  # the owner acco
 npm run invite -- --org "Pilote Fahim" --replace <user id>    # new code, the old one stops working
 ```
 
-The owner signs in with their code like a student, then opens `/revue`: the sessions of the organization with the step reached and the cost, and each transcript. The role is read from the database at each request; every view is written to `access_log` in the same transaction as the read. Anyone else gets a 404.
+The owner signs in with their code like a student, then opens `/revue` (the owner account cannot start a session; see decision 0006): the sessions of the organization with the step reached and the cost, and each transcript. The role is read from the database at each request; every view is written to `access_log` in the same transaction as the read. Anyone else gets a 404.
 
 With `DATABASE_URL` set, the web app stores sessions and the misconception map in PostgreSQL and asks for an invitation code; without it, it keeps everything in memory and, in development only, gives each browser an anonymous student.
 

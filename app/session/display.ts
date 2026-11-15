@@ -59,6 +59,8 @@ export function visibleStepIndex(step: string): number {
 /** Error codes of the session API, explained to the student. */
 export function errorMessage(code: string | undefined): string {
   switch (code) {
+    case 'not_a_student':
+      return 'Ce compte sert à relire les séances des élèves, sur la page /revue. Pour jouer une séance, connecte-toi avec un code élève.';
     case 'daily_limit':
       return 'Tu as fait toutes tes séances pour aujourd’hui. Reviens demain pour la suite.';
     case 'conflict':
