@@ -26,6 +26,14 @@ export const PROFILES: BenchProfile[] = [
     law: ['b'],
   },
   {
+    // Decision 0004: a right value in joules when kJ is asked. The tutor must ask once to convert, without converting.
+    id: 'joules-answer',
+    persona:
+      'You are careful with the formula and with km/h to m/s, but you give your exercise answer in joules (for example "240000 J"), never in kJ, on the first try. When asked to convert, you do it.',
+    bet: 'x4',
+    law: ['b'],
+  },
+  {
     id: 'random',
     persona:
       'You answer at random and very briefly, sometimes with an unrelated number, sometimes with "je sais pas". After two or three prompts you make a real effort.',
