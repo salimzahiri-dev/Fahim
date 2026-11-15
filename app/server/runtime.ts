@@ -31,6 +31,14 @@ function cookieSecret(env: Env, production: boolean): string {
   return randomBytes(32).toString('hex');
 }
 
+function proxySecret(env: Env, production: boolean): string | undefined {
+  const fromEnv = env.FAHIM_PROXY_SECRET;
+  if (fromEnv && fromEnv.length >= 32) return fromEnv;
+  // Without it the sign-in attempt limit cannot tell clients apart behind the proxy (D2).
+  if (production) throw new Error('FAHIM_PROXY_SECRET must be set (at least 32 characters) in production');
+  return undefined;
+}
+
 function modelProvider(env: Env, production: boolean): ModelProvider {
   // FAHIM_MODEL_PROVIDER=offline plays a session without the API, to test the interface for free.
   if (env.FAHIM_MODEL_PROVIDER === 'offline') {
@@ -78,6 +86,7 @@ export function buildServer(env: Env = process.env): Server {
     },
     cookieSecret: secret,
     secureCookies: production,
+    proxySecret: proxySecret(env, production),
     lessonId: PILOT_LESSON_ID,
     ...(db ? { invitations: new PostgresInvitationDirectory(db), accounts: new PostgresAccountDirectory(db) } : {}),
     ...(!anonymous ? {} : { newStudent: () => ({ role: 'student' as const, orgId: PILOT_ORG_ID, studentId: randomUUID() }) }),

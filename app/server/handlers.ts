@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { DailyLimitError } from '../../core/billing/quota';
 import type { StudentIdentity } from '../../core/access/access';
 import { hashInvitationCode, normalizeInvitationCode, type InvitationDirectory } from '../../core/access/invitationCode';
@@ -46,6 +46,11 @@ export interface HandlerDeps {
    * start a session gets a clear refusal instead of a failed insert.
    */
   accounts?: AccountDirectory;
+  /**
+   * Secret the reverse proxy (Caddy, D2) adds to every request it forwards, in
+   * X-Fahim-Proxy-Secret. X-Forwarded-For is trusted only on requests that carry it.
+   */
+  proxySecret?: string;
 }
 
 type ErrorCode =
@@ -154,7 +159,7 @@ export function createSessionHandlers(deps: HandlerDeps) {
       try {
         // A string that cannot be a code still counts as a failed attempt, under an impossible hash.
         const hash = canonical ? hashInvitationCode(canonical) : Buffer.alloc(32);
-        const result = await deps.invitations.signIn(hash, clientKey(request, deps.cookieSecret));
+        const result = await deps.invitations.signIn(hash, clientKey(request, deps.cookieSecret, deps.proxySecret));
         if (result.status === 'locked') return error('too_many_attempts');
         if (result.status !== 'ok') return error('invalid_code');
         const headers = new Headers(NO_STORE);
@@ -185,15 +190,31 @@ export function createSessionHandlers(deps: HandlerDeps) {
   };
 }
 
+export const PROXY_SECRET_HEADER = 'x-fahim-proxy-secret';
+
+function sameSecret(given: string | null, expected: string): boolean {
+  if (!given) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 /**
- * Identifies the client for the failed-attempt limit without storing its address:
- * an HMAC of the address the reverse proxy reports. Without a proxy header every
- * client shares one bucket, which fails closed.
+ * The client address for the failed-attempt limit. X-Forwarded-For is believed
+ * only when the request carries the proxy's secret: Caddy replaces any
+ * X-Forwarded-For sent by the client with the address it sees, and adds the
+ * secret. Anything else (no proxy configured, a request that reached the app
+ * directly, a wrong secret) falls into one shared bucket, which fails closed.
  */
-function clientKey(request: Request, secret: string): string {
-  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  const address = forwarded || request.headers.get('x-real-ip')?.trim() || 'unknown';
-  return createHmac('sha256', secret).update(`sign-in:${address}`).digest('hex');
+export function clientAddress(headers: Headers, proxySecret: string | undefined): string {
+  if (!proxySecret || !sameSecret(headers.get(PROXY_SECRET_HEADER), proxySecret)) return 'direct';
+  // Caddy sends one address; if a chain ever arrives, the last hop is the one Caddy saw.
+  return headers.get('x-forwarded-for')?.split(',').at(-1)?.trim() || 'direct';
+}
+
+/** Identifies the client without storing its address: an HMAC of it. */
+function clientKey(request: Request, secret: string, proxySecret: string | undefined): string {
+  return createHmac('sha256', secret).update(`sign-in:${clientAddress(request.headers, proxySecret)}`).digest('hex');
 }
 
 export type SessionHandlers = ReturnType<typeof createSessionHandlers>;

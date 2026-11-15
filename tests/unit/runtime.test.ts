@@ -4,18 +4,24 @@ import { buildSessionHandlers } from '../../app/server/runtime';
 // Owner decisions (2026-11-14): anonymous students and the offline provider are for development only.
 
 const SECRET = 'x'.repeat(40);
+const PROXY = 'p'.repeat(40);
 const start = () => new Request('http://localhost/api/sessions', { method: 'POST' });
 
 describe('server wiring by environment', () => {
   it('refuses to start with the offline provider in production', () => {
     expect(() =>
-      buildSessionHandlers({ NODE_ENV: 'production', FAHIM_MODEL_PROVIDER: 'offline', FAHIM_COOKIE_SECRET: SECRET }),
+      buildSessionHandlers({ NODE_ENV: 'production', FAHIM_MODEL_PROVIDER: 'offline', FAHIM_COOKIE_SECRET: SECRET, FAHIM_PROXY_SECRET: PROXY }),
     ).toThrow(/development only/);
   });
 
   it('refuses a session without sign-in in production', async () => {
     // A placeholder key: the request is refused before any model call.
-    const handlers = buildSessionHandlers({ NODE_ENV: 'production', ANTHROPIC_API_KEY: 'placeholder-not-a-key', FAHIM_COOKIE_SECRET: SECRET });
+    const handlers = buildSessionHandlers({
+      NODE_ENV: 'production',
+      ANTHROPIC_API_KEY: 'placeholder-not-a-key',
+      FAHIM_COOKIE_SECRET: SECRET,
+      FAHIM_PROXY_SECRET: PROXY,
+    });
     const res = await handlers.start(start());
     expect(res.status).toBe(401);
     expect(res.headers.get('set-cookie')).toBeNull();
@@ -26,6 +32,12 @@ describe('server wiring by environment', () => {
     expect(() => buildSessionHandlers({ NODE_ENV: 'production', ANTHROPIC_API_KEY: 'placeholder-not-a-key' })).toThrow(
       /FAHIM_COOKIE_SECRET/,
     );
+  });
+
+  it('refuses to start in production without the proxy secret', () => {
+    expect(() =>
+      buildSessionHandlers({ NODE_ENV: 'production', ANTHROPIC_API_KEY: 'placeholder-not-a-key', FAHIM_COOKIE_SECRET: SECRET }),
+    ).toThrow(/FAHIM_PROXY_SECRET/);
   });
 
   it('gives an anonymous identity in development with the offline provider', async () => {

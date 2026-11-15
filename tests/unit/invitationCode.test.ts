@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createSessionHandlers, type HandlerDeps } from '../../app/server/handlers';
+import { clientAddress, createSessionHandlers, type HandlerDeps } from '../../app/server/handlers';
 import {
   CODE_LENGTH,
   generateInvitationCode,
@@ -49,6 +49,9 @@ describe('sign-in route', () => {
   const { code } = generateInvitationCode();
   const goodHash = hashInvitationCode(normalizeInvitationCode(code)!);
 
+  const PROXY = 'proxy-secret-proxy-secret-proxy-1111';
+  const viaProxy = { 'x-fahim-proxy-secret': PROXY };
+
   function setup(override?: SignInResult) {
     const calls: Array<{ hash: Buffer; client: string }> = [];
     const directory: InvitationDirectory = {
@@ -79,6 +82,7 @@ describe('sign-in route', () => {
       secureCookies: true,
       lessonId: 'work-kinetic-energy',
       invitations: directory,
+      proxySecret: PROXY,
     };
     return { handlers: createSessionHandlers(deps), calls };
   }
@@ -123,11 +127,21 @@ describe('sign-in route', () => {
 
   it('keys the attempt limit on a hash of the client address, never the address itself', async () => {
     const { handlers, calls } = setup();
-    await handlers.signIn(signIn({ code: 'x' }, { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' }));
-    await handlers.signIn(signIn({ code: 'x' }, { 'x-forwarded-for': '203.0.113.8' }));
+    await handlers.signIn(signIn({ code: 'x' }, { ...viaProxy, 'x-forwarded-for': '203.0.113.7' }));
+    await handlers.signIn(signIn({ code: 'x' }, { ...viaProxy, 'x-forwarded-for': '203.0.113.8' }));
     expect(calls[0]!.client).toMatch(/^[0-9a-f]{64}$/);
     expect(calls[0]!.client).not.toContain('203.0.113.7');
     expect(calls[0]!.client).not.toBe(calls[1]!.client);
+  });
+
+  it('believes X-Forwarded-For only with the proxy secret', () => {
+    const h = (extra: Record<string, string>) => new Headers({ 'x-forwarded-for': '203.0.113.9', ...extra });
+    expect(clientAddress(h(viaProxy), PROXY)).toBe('203.0.113.9');
+    expect(clientAddress(h({}), PROXY)).toBe('direct');
+    expect(clientAddress(h({ 'x-fahim-proxy-secret': 'wrong' }), PROXY)).toBe('direct');
+    expect(clientAddress(h({ 'x-fahim-proxy-secret': PROXY.replace('1', '2') }), PROXY)).toBe('direct');
+    // No proxy configured (development): nobody's header is believed.
+    expect(clientAddress(h(viaProxy), undefined)).toBe('direct');
   });
 
   it('refuses a body with anything but the code', async () => {

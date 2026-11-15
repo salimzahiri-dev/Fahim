@@ -25,8 +25,11 @@ afterAll(async () => {
   await admin?.end();
 });
 
+/** The secret Caddy adds to every request it forwards (D2); the tests play the proxy. */
+const PROXY_SECRET = 'proxy-secret-proxy-secret-proxy-0000';
+
 /** A server process: PostgreSQL as fahim_app, the offline model (no API spending). */
-function server() {
+function server(cookieSecret = SECRET) {
   const pool = createPool(APP_URL);
   pools.push(pool);
   return createSessionHandlers({
@@ -44,28 +47,30 @@ function server() {
       store: new PostgresSessionStore(pool),
       newSessionId: randomUUID,
     },
-    cookieSecret: SECRET,
+    cookieSecret,
     secureCookies: false,
     lessonId: 'work-kinetic-energy',
     invitations: new PostgresInvitationDirectory(pool),
+    proxySecret: PROXY_SECRET,
   });
 }
 
 type Handlers = ReturnType<typeof server>;
 
-const request = (url: string, init: { cookie?: string; body?: unknown; ip?: string; method?: string } = {}) =>
+const request = (url: string, init: { cookie?: string; body?: unknown; ip?: string; method?: string; proxy?: string | null } = {}) =>
   new Request(`http://localhost${url}`, {
     method: init.method ?? 'POST',
     headers: {
       'content-type': 'application/json',
       'x-forwarded-for': init.ip ?? '198.51.100.1',
+      ...(init.proxy === null ? {} : { 'x-fahim-proxy-secret': init.proxy ?? PROXY_SECRET }),
       ...(init.cookie ? { cookie: init.cookie } : {}),
     },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
   });
 
-async function signIn(h: Handlers, code: string, ip?: string): Promise<{ status: number; cookie: string | null }> {
-  const res = await h.signIn(request('/api/sign-in', { body: { code }, ip }));
+async function signIn(h: Handlers, code: string, ip?: string, proxy?: string | null): Promise<{ status: number; cookie: string | null }> {
+  const res = await h.signIn(request('/api/sign-in', { body: { code }, ip, proxy }));
   return { status: res.status, cookie: res.headers.get('set-cookie')?.split(';')[0] ?? null };
 }
 
@@ -135,6 +140,20 @@ describe('sign-in with invitation codes', () => {
     // Only a hash of the address is stored.
     const stored = await admin.query('SELECT client FROM sign_in_attempts');
     expect(JSON.stringify(stored.rows)).not.toContain(ip);
+  });
+
+  it('trusts X-Forwarded-For only from the proxy: a forged address does not escape the lockout', async () => {
+    const orgId = await findOrCreateOrganization(admin, `Pilote ${randomUUID()}`, 'center');
+    const student = await createInvitedStudent(admin, { orgId, displayName: 'Élève F' });
+    // A cookie secret of its own gives this test its own buckets.
+    const h = server(`forged-${randomUUID()}`);
+    const forged = () => `203.0.113.${Math.floor(Math.random() * 250) + 1}`;
+    // A client that reaches the app directly, with a new address in each request.
+    for (let i = 0; i < 10; i++) expect((await signIn(h, 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AA', forged(), null)).status).toBe(401);
+    expect((await signIn(h, student.code, forged(), null)).status).toBe(429);
+    expect((await signIn(h, student.code, forged(), 'not-the-proxy-secret-not-the-proxy')).status).toBe(429);
+    // A real client behind the proxy is not affected.
+    expect((await signIn(h, student.code, '192.0.2.77')).status).toBe(200);
   });
 
   it('revokes the previous code when a new one is issued, and stores no code in clear', async () => {
