@@ -4,7 +4,7 @@ export interface FahimConfig {
   maxTokens: number;
   priceInputPerMTok: number;
   priceOutputPerMTok: number;
-  /** Sessions a student may start in 24 hours. 0 means no limit. */
+  /** Sessions a student may start per calendar day (Africa/Casablanca). 0 means no limit. */
   maxSessionsPerDay: number;
   env: 'development' | 'production';
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSessionHandlers } from '../../app/server/handlers';
-import { assertWithinDailyLimit, DailyLimitError, QUOTA_WINDOW_MS } from '../../core/billing/quota';
+import { assertWithinDailyLimit, DailyLimitError, startOfLocalDay } from '../../core/billing/quota';
 import { signStudentCookie } from '../../core/access/studentCookie';
 import { InMemoryMisconceptionStore } from '../../core/memory/misconceptionStore';
 import { InMemorySessionStore } from '../../core/session/sessionStore';
@@ -16,8 +16,9 @@ describe('daily session limit', () => {
     expect(() => assertWithinDailyLimit(500, 0)).not.toThrow();
   });
 
-  it('refuses a third session in 24 hours before any model call, per student, and reopens after the window', async () => {
-    let now = new Date('2026-11-14T08:00:00Z');
+  it('refuses a third session on the same Moroccan calendar day before any model call, per student, and reopens at local midnight', async () => {
+    // 14 November, 21:30 in Casablanca (UTC+1).
+    let now = new Date('2026-11-14T20:30:00Z');
     const clock = () => now;
     const model = new ScriptedProvider(Array.from({ length: 10 }, () => say('piège')));
     const handlers = createSessionHandlers({
@@ -51,7 +52,7 @@ describe('daily session limit', () => {
       handlers.start(new Request('http://localhost/api/sessions', { method: 'POST', headers: { cookie: cookie(studentId) } }));
 
     expect((await start('a')).status).toBe(201);
-    now = new Date(now.getTime() + 60 * 60 * 1000);
+    now = new Date('2026-11-14T22:30:00Z'); // 23:30 local, same day
     expect((await start('a')).status).toBe(201);
     const calls = model.requests.length;
 
@@ -62,9 +63,34 @@ describe('daily session limit', () => {
 
     expect((await start('b')).status).toBe(201);
 
-    // 24 hours after the first session, one slot is free again.
-    now = new Date(Date.parse('2026-11-14T08:00:00Z') + QUOTA_WINDOW_MS + 1);
+    // 23:59 local is still the same day; a sliding 24-hour window would also refuse here.
+    now = new Date('2026-11-14T22:59:00Z');
+    expect((await start('a')).status).toBe(429);
+    // 00:10 local on 15 November: a new day, although less than 24 hours have passed.
+    now = new Date('2026-11-14T23:10:00Z');
+    expect((await start('a')).status).toBe(201);
     expect((await start('a')).status).toBe(201);
     expect((await start('a')).status).toBe(429);
+  });
+});
+
+describe('start of the local day', () => {
+  const localTime = (d: Date) =>
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Casablanca', hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).format(d);
+  const localDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Casablanca' }).format(d);
+
+  it('is local midnight in Casablanca, not UTC midnight', () => {
+    expect(startOfLocalDay(new Date('2026-11-14T23:30:00Z')).toISOString()).toBe('2026-11-14T23:00:00.000Z');
+    expect(startOfLocalDay(new Date('2026-11-14T22:30:00Z')).toISOString()).toBe('2026-11-13T23:00:00.000Z');
+  });
+
+  it('is 00:00 on the same local date, whatever the offset in force (Ramadan included)', () => {
+    for (let t = Date.parse('2026-01-01T00:00:00Z'); t < Date.parse('2027-01-01T00:00:00Z'); t += 7 * 3600 * 1000 + 1234567) {
+      const now = new Date(t);
+      const start = startOfLocalDay(now);
+      expect(localTime(start)).toBe('00:00');
+      expect(localDate(start)).toBe(localDate(now));
+      expect(start.getTime()).toBeLessThanOrEqual(t);
+    }
   });
 });

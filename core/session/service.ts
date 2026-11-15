@@ -1,5 +1,5 @@
 import { canAccessStudent, type StudentIdentity } from '../access/access';
-import { assertWithinDailyLimit, QUOTA_WINDOW_MS } from '../billing/quota';
+import { assertWithinDailyLimit, startOfLocalDay } from '../billing/quota';
 import { handleEvent, type EngineDeps } from './engine';
 import type { SessionStore, StoreScope } from './sessionStore';
 import { InvalidEventError, newSession, type SessionEvent, type Step, type UiAction } from './types';
@@ -14,7 +14,7 @@ export interface SessionServiceDeps {
   engine: EngineDeps;
   store: SessionStore;
   newSessionId: () => string;
-  /** Sessions a student may start in 24 hours (C4). Absent or 0: no limit. */
+  /** Sessions a student may start per calendar day in Morocco (C4). Absent or 0: no limit. */
   maxSessionsPerDay?: number;
   /** Injected clock, for the quota window. */
   now?: () => Date;
@@ -111,7 +111,7 @@ export async function startSession(actor: StudentIdentity, lessonId: string, dep
   if (!deps.engine.registries.lessons.has(lessonId)) throw new InvalidEventError(`Unknown lesson ${lessonId}`);
   if (deps.maxSessionsPerDay && deps.maxSessionsPerDay > 0) {
     // Checked before the first model call, so a refused session costs nothing.
-    const since = new Date((deps.now ?? (() => new Date()))().getTime() - QUOTA_WINDOW_MS).toISOString();
+    const since = startOfLocalDay((deps.now ?? (() => new Date()))()).toISOString();
     const started = await deps.store.countStartedSince(scopeOf(actor), actor.studentId, since);
     assertWithinDailyLimit(started, deps.maxSessionsPerDay);
   }
