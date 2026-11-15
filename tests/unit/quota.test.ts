@@ -17,8 +17,12 @@ describe('daily session limit', () => {
   });
 
   it('refuses a third session on the same Moroccan calendar day before any model call, per student, and reopens at local midnight', async () => {
-    // 14 November, 21:30 in Casablanca (UTC+1).
-    let now = new Date('2026-11-14T20:30:00Z');
+    // Times are placed around the local midnight that starts 15 November in Casablanca, as the
+    // runtime's time zone data computes it: Morocco's offset differs between tzdata versions.
+    const midnight = startOfLocalDay(new Date('2026-11-15T12:00:00Z')).getTime();
+    const minutes = (m: number) => new Date(midnight + m * 60 * 1000);
+    let now = minutes(-150); // 21:30 local on 14 November
+
     const clock = () => now;
     const model = new ScriptedProvider(Array.from({ length: 10 }, () => say('piège')));
     const handlers = createSessionHandlers({
@@ -52,7 +56,7 @@ describe('daily session limit', () => {
       handlers.start(new Request('http://localhost/api/sessions', { method: 'POST', headers: { cookie: cookie(studentId) } }));
 
     expect((await start('a')).status).toBe(201);
-    now = new Date('2026-11-14T22:30:00Z'); // 23:30 local, same day
+    now = minutes(-30); // 23:30 local, same day
     expect((await start('a')).status).toBe(201);
     const calls = model.requests.length;
 
@@ -64,10 +68,10 @@ describe('daily session limit', () => {
     expect((await start('b')).status).toBe(201);
 
     // 23:59 local is still the same day; a sliding 24-hour window would also refuse here.
-    now = new Date('2026-11-14T22:59:00Z');
+    now = minutes(-1);
     expect((await start('a')).status).toBe(429);
     // 00:10 local on 15 November: a new day, although less than 24 hours have passed.
-    now = new Date('2026-11-14T23:10:00Z');
+    now = minutes(10);
     expect((await start('a')).status).toBe(201);
     expect((await start('a')).status).toBe(201);
     expect((await start('a')).status).toBe(429);
@@ -79,9 +83,10 @@ describe('start of the local day', () => {
     new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Casablanca', hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).format(d);
   const localDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Casablanca' }).format(d);
 
-  it('is local midnight in Casablanca, not UTC midnight', () => {
-    expect(startOfLocalDay(new Date('2026-11-14T23:30:00Z')).toISOString()).toBe('2026-11-14T23:00:00.000Z');
-    expect(startOfLocalDay(new Date('2026-11-14T22:30:00Z')).toISOString()).toBe('2026-11-13T23:00:00.000Z');
+  it('is local midnight in the given zone, not UTC midnight', () => {
+    // Tokyo has kept UTC+9 without daylight saving for decades, so the expected instants are stable.
+    expect(startOfLocalDay(new Date('2026-11-14T16:30:00Z'), 'Asia/Tokyo').toISOString()).toBe('2026-11-14T15:00:00.000Z');
+    expect(startOfLocalDay(new Date('2026-11-14T14:30:00Z'), 'Asia/Tokyo').toISOString()).toBe('2026-11-13T15:00:00.000Z');
   });
 
   it('is 00:00 on the same local date, whatever the offset in force (Ramadan included)', () => {
